@@ -1,0 +1,31 @@
+name: 打包 APK
+on:
+  push:
+  workflow_dispatch:
+permissions:
+  contents: write
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    steps:
+      - 使用: actions/checkout@v4
+      - 使用: actions/setup-java@v4
+        with:
+          发行版: temurin
+          java-version: '17'
+      - 使用: android-actions/setup-android@v3
+      - name: 打包
+        run: |
+          chmod +x gradlew
+          ./gradlew assembleDebug --no-daemon --stacktrace
+      - run: cp app/build/outputs/apk/debug/app-debug.apk zhibuzhi.apk
+      - uses: actions/upload-artifact@v4
+        with:
+          名称: zhibuzhi-apk
+          路径: zhibuzhi.apk
+      - 用途: softprops/action-gh-release@v2
+        with:
+          标签名称: build-${{ github.run_number }}
+          name: 值不值 第 ${{ github.run_number }} 版
+          文件: zhibuzhi.apk
+          make_latest: true
