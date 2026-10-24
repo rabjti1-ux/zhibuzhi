@@ -40,15 +40,17 @@ import java.util.concurrent.Executors;
 
 /**
  * 整个 app 就是一个全屏 WebView，界面在 assets/index.html。
- * 这里负责：保存账本、保存 API key、调用 Claude API、选文件、导出备份、付款通知。
+ * 这里负责：保存账本、保存 API key、调用 AI 接口（Claude / GPT / 其他兼容 OpenAI 的服务）、选文件、导出备份、付款通知。
  */
 public class MainActivity extends Activity {
 
     private static final int REQ_FILE = 1;
     private static final int REQ_EXPORT = 2;
     private static final int REQ_NOTIFY = 3;
-    private static final String API_URL = "https://api.anthropic.com/v1/messages";
-    private static final String API_VERSION = "2023-06-01";
+    // 三种服务商：claude（Anthropic）、openai（GPT）、custom（其他兼容 OpenAI 格式的服务）
+    private static final String CLAUDE_URL = "https://api.anthropic.com/v1/messages";
+    private static final String CLAUDE_VERSION = "2023-06-01";
+    private static final String OPENAI_URL = "https://api.openai.com/v1/chat/completions";
     private static final String DATA_FILE = "data.json";
 
     private WebView web;
@@ -63,6 +65,7 @@ public class MainActivity extends Activity {
     protected void onCreate(Bundle savedInstanceState) {
         super.onCreate(savedInstanceState);
         applySystemBars();
+        migrateKey();
 
         web = new WebView(this);
         web.setBackgroundColor(isNight() ? 0xFF0B0D10 : 0xFFF2F3F5);
@@ -228,6 +231,34 @@ public class MainActivity extends Activity {
         return getSharedPreferences("app", MODE_PRIVATE);
     }
 
+    private static String normProvider(String p) {
+        return "openai".equals(p) || "custom".equals(p) ? p : "claude";
+    }
+
+    private static String keyName(String provider) {
+        return "key_" + normProvider(provider);
+    }
+
+    /** 旧版本只存了一个 Claude 的 key，挪到新位置 */
+    private void migrateKey() {
+        SharedPreferences p = prefs();
+        String old = p.getString("key", "");
+        if (!old.isEmpty() && p.getString("key_claude", "").isEmpty()) {
+            p.edit().putString("key_claude", old).remove("key").apply();
+        }
+    }
+
+    private String endpoint(String provider) {
+        if ("openai".equals(provider)) return OPENAI_URL;
+        if ("custom".equals(provider)) {
+            String base = prefs().getString("customUrl", "").trim();
+            while (base.endsWith("/")) base = base.substring(0, base.length() - 1);
+            if (base.isEmpty()) return "";
+            return base.endsWith("/chat/completions") ? base : base + "/chat/completions";
+        }
+        return CLAUDE_URL;
+    }
+
     // ---------- 文件读写 ----------
 
     private static String readAll(InputStream in) throws IOException {
@@ -266,23 +297,31 @@ public class MainActivity extends Activity {
         return true;
     }
 
-    // ---------- 调用 Claude API ----------
+    // ---------- 调用 AI 接口 ----------
 
-    private void callClaude(String id, String body) {
-        String key = prefs().getString("key", "");
+    private void callApi(String id, String providerIn, String body) {
+        String provider = normProvider(providerIn);
+        String key = prefs().getString(keyName(provider), "");
         boolean ok = false;
         String payload;
         HttpURLConnection conn = null;
         try {
             if (key.isEmpty()) throw new IllegalStateException("nokey");
-            conn = (HttpURLConnection) new URL(API_URL).openConnection();
+            String url = endpoint(provider);
+            if (url.isEmpty()) throw new IllegalStateException("nourl");
+            if (!url.startsWith("https://")) throw new IllegalStateException("nohttps");
+            conn = (HttpURLConnection) new URL(url).openConnection();
             conn.setRequestMethod("POST");
             conn.setConnectTimeout(15000);
             conn.setReadTimeout(120000);
             conn.setDoOutput(true);
             conn.setRequestProperty("content-type", "application/json");
-            conn.setRequestProperty("x-api-key", key);
-            conn.setRequestProperty("anthropic-version", API_VERSION);
+            if ("claude".equals(provider)) {
+                conn.setRequestProperty("x-api-key", key);
+                conn.setRequestProperty("anthropic-version", CLAUDE_VERSION);
+            } else {
+                conn.setRequestProperty("Authorization", "Bearer " + key);
+            }
             byte[] out = body.getBytes(StandardCharsets.UTF_8);
             conn.setFixedLengthStreamingMode(out.length);
             try (OutputStream os = conn.getOutputStream()) {
@@ -318,7 +357,7 @@ public class MainActivity extends Activity {
         } finally {
             if (conn != null) conn.disconnect();
         }
-        final String code = "window.__onClaude&&window.__onClaude(" + JSONObject.quote(id) + "," + ok + "," + JSONObject.quote(payload) + ")";
+        final String code = "window.__onAI&&window.__onAI(" + JSONObject.quote(id) + "," + ok + "," + JSONObject.quote(payload) + ")";
         runOnUiThread(() -> js(code));
     }
 
@@ -337,25 +376,35 @@ public class MainActivity extends Activity {
         }
 
         @JavascriptInterface
-        public boolean hasKey() {
-            return !prefs().getString("key", "").isEmpty();
+        public boolean hasKey(String provider) {
+            return !prefs().getString(keyName(provider), "").isEmpty();
         }
 
         @JavascriptInterface
-        public String keyHint() {
-            String k = prefs().getString("key", "");
+        public String keyHint(String provider) {
+            String k = prefs().getString(keyName(provider), "");
             if (k.length() <= 12) return k.isEmpty() ? "" : "已保存";
-            return k.substring(0, 7) + "…" + k.substring(k.length() - 4);
+            return k.substring(0, 6) + "…" + k.substring(k.length() - 4);
         }
 
         @JavascriptInterface
-        public void setKey(String key) {
-            prefs().edit().putString("key", key == null ? "" : key.trim()).apply();
+        public void setKey(String provider, String key) {
+            prefs().edit().putString(keyName(provider), key == null ? "" : key.trim()).apply();
         }
 
         @JavascriptInterface
-        public void ask(final String id, final String body) {
-            pool.execute(() -> callClaude(id, body));
+        public String getCustomUrl() {
+            return prefs().getString("customUrl", "");
+        }
+
+        @JavascriptInterface
+        public void setCustomUrl(String url) {
+            prefs().edit().putString("customUrl", url == null ? "" : url.trim()).apply();
+        }
+
+        @JavascriptInterface
+        public void ask(final String id, final String provider, final String body) {
+            pool.execute(() -> callApi(id, provider, body));
         }
 
         @JavascriptInterface

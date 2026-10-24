@@ -1,20 +1,41 @@
 # 值不值 · 安卓版
 
-一个简洁的记账 app，Claude 在里面帮你记账、查账、判断值不值。
+一个简洁的记账 app，AI 在里面帮你记账、查账、判断值不值。AI 可以用 **Claude**、**GPT**，或者其他兼容 OpenAI 格式的服务。
 
 - **记账**：点中间的 ＋，数字键盘输金额，选分类，记一笔
-- **Claude 助手**：直接说"午饭 18，奶茶 15"，它会帮你把这两笔记进去；也可以问"这个月吃饭花了多少""299 的耳机值吗"
-- **值不值**：记账时点「值不值？」，Claude 会结合你这个月的花销和预算盖章判断
+- **AI 助手**：直接说"午饭 18，奶茶 15"，它会帮你把这两笔记进去；也可以问"这个月吃饭花了多少""299 的耳机值吗"
+- **值不值**：记账时点「值不值？」，AI 会结合你这个月的花销和预算盖章判断
 - **付款后自动提醒**：开启后，微信支付、支付宝的付款通知一到，app 就弹提醒让你记一笔
-- **统计**：分类环形图、每日支出、Claude 月度点评
+- **统计**：分类环形图、每日支出、AI 月度点评
 - **导入账单**：微信 / 支付宝导出的 .csv 或 .xlsx
 - **备份**：导出成 .json 文件，换手机后导入恢复
 
-账本只存在手机上。只有用 Claude 功能时，相关的账目摘要会发给 Anthropic 的 API。
+账本只存在手机上。只有用 AI 功能时，相关的账目摘要会发给你选的那家 AI 服务商。
 
 ---
 
 ## 一、打包成 APK
+
+### 方法 A：让 GitHub 自动打包（不用装任何软件）
+
+1. 注册 / 登录 **github.com**，右上角 ＋ → **New repository**，起个名字（比如 `zhibuzhi`），选 **Public**，点 Create。
+2. 在新仓库页面点 **uploading an existing file**，把解压后 `ZhiBuZhi` 文件夹**里面的所有东西**拖进去（不要拖外层文件夹本身），点 Commit changes。
+   - `.github` 是隐藏文件夹，Mac 上在访达里按 `Cmd + Shift + .` 才能看到；一定要一起传上去。
+   - 如果传不上隐藏文件夹：在仓库里点 Add file → Create new file，文件名填 `.github/workflows/build-apk.yml`，把本项目里同名文件的内容粘贴进去，Commit。
+3. 点仓库上方的 **Actions**，能看到「打包 APK」在运行，等它变成绿色的 ✓（大约 5 分钟）。
+4. 下载链接就是：
+
+   ```
+   https://github.com/你的用户名/zhibuzhi/releases/latest/download/zhibuzhi.apk
+   ```
+
+   用手机浏览器打开，下载后安装。以后改了代码再传上去，会自动打包新版本，链接不变。
+
+如果第 3 步变成红色 ✗，点进去复制报错文字发给我。
+
+代码里没有你的 API key（key 是装好后在 app 里填的），所以仓库设成 Public 没关系。
+
+### 方法 B：用 Android Studio 自己打包
 
 1. 在电脑上安装 **Android Studio**（官网 developer.android.com/studio，国内也可以从 developer.android.google.cn/studio 下载）。
 2. 解压这个文件夹，打开 Android Studio → **Open** → 选 `ZhiBuZhi` 文件夹。
@@ -38,22 +59,43 @@ distributionUrl=https\://mirrors.cloud.tencent.com/gradle/gradle-8.9-bin.zip
 
 ---
 
-## 二、填 API key
+## 二、选 AI、填 API key
 
-1. 去 **console.anthropic.com** 注册，在 **API Keys** 里创建一个 key（以 `sk-ant-` 开头）。
+打开 app →「我的」→「用哪家 AI」，选一个，再粘贴对应的 key → 保存。三家的 key 分开保存，随时可以切换。
+
+### Claude（Anthropic）
+
+1. 去 **console.anthropic.com** 注册，在 **API Keys** 里创建 key（以 `sk-ant-` 开头）。
 2. 在 **Billing** 里充值。API 按用量付费，和 Claude 网页版的会员是分开的。
-3. 打开 app →「我的」→ 粘贴 key → 保存。
-
-模型可以在「我的」里切换：
 
 | 模型 | 说明 |
 | --- | --- |
 | Haiku 5.5（默认） | 最快最省。记一笔、问一次值不值，大约不到 1 分钱人民币 |
 | Sonnet 5.5 | 更聪明，价格约是 Haiku 的 20 倍 |
 
-注意：Anthropic 的 API 只在它支持的国家和地区提供。如果一直提示"连不上 Claude 的服务器"，多半是网络或地区原因。
+### GPT（OpenAI）
 
-key 只存在这台手机的 app 私有空间里，不会备份、不会上传到别处。
+1. 去 **platform.openai.com** 注册，在 **API keys** 里创建 key（以 `sk-` 开头）。
+2. 在 **Billing** 里充值。API 和 ChatGPT 的会员是分开计费的。
+
+| 模型 | 说明 |
+| --- | --- |
+| GPT-6 Luna（默认） | 最快最省，价格和 Claude Haiku 5.5 一样 |
+| GPT-6.1 Sol | 更聪明，价格约是 Luna 的 20 倍 |
+
+注意：Anthropic 和 OpenAI 的 API 都只在它们支持的国家和地区提供。如果一直提示"连不上服务器"，多半是网络或地区原因。
+
+### 其他（兼容 OpenAI 格式的服务）
+
+很多服务商的接口和 OpenAI 格式一样，比如 DeepSeek、通义千问、Kimi。选「其他」后填三样东西，都能在服务商的 API 文档里找到：
+
+- **API key**
+- **接口地址**（base URL），比如 `https://api.deepseek.com`，填到 `/v1` 或域名这一级就行，app 会自动补上 `/chat/completions`
+- **模型名**，比如 `deepseek-chat`
+
+具体地址和模型名以服务商文档为准，它们会更新。
+
+key 和接口地址只存在这台手机的 app 私有空间里，不会备份、不会上传到别处。
 
 ---
 
@@ -89,11 +131,11 @@ key 只存在这台手机的 app 私有空间里，不会备份、不会上传�
 app/src/main/
 ├── assets/index.html            界面和全部前端逻辑（记账、统计、Claude、导入）
 ├── java/com/zhibuzhi/app/
-│   ├── MainActivity.java        WebView 外壳：存账本、存 key、调 Claude API、选文件、导出备份
+│   ├── MainActivity.java        WebView 外壳：存账本、存 key、调 AI 接口、选文件、导出备份
 │   └── PayListener.java         读取微信 / 支付宝付款通知，弹出记账提醒
 ├── res/                         图标、颜色、主题
 └── AndroidManifest.xml
 ```
 
-想改界面、分类、提示词，改 `assets/index.html` 就行，改完重新 Build APK。
-调 API 的地址、超时在 `MainActivity.java` 顶部。识别付款的关键词在 `PayListener.java` 顶部。
+想改界面、分类、提示词、默认模型，改 `assets/index.html` 就行（服务商和模型列表在文件里 `PROVIDERS` 那一段），改完重新 Build APK。
+接口地址、超时在 `MainActivity.java` 顶部。识别付款的关键词在 `PayListener.java` 顶部。

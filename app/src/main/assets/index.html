@@ -242,11 +242,11 @@ details[open] summary::after{transform:rotate(45deg)}
 <div class="app">
   <section class="view" id="v-home" aria-label="明细"></section>
   <section class="view" id="v-stats" aria-label="统计" hidden></section>
-  <section class="view chat" id="v-claude" aria-label="Claude 助手" hidden>
-    <div class="chat-top"><span class="ic" id="chat-ic"></span><div><h1>Claude 记账助手</h1><p id="chat-sub">说"午饭 18"就能记一笔，也可以问账、问值不值</p></div></div>
+  <section class="view chat" id="v-claude" aria-label="记账助手" hidden>
+    <div class="chat-top"><span class="ic" id="chat-ic"></span><div><h1 id="chat-title">Claude 记账助手</h1><p id="chat-sub">说"午饭 18"就能记一笔，也可以问账、问值不值</p></div></div>
     <div class="msgs" id="msgs" aria-live="polite"></div>
     <form class="composer" id="composer" autocomplete="off">
-      <input type="text" id="c-in" placeholder="比如：奶茶 15，打车 23" aria-label="给 Claude 发消息" maxlength="300">
+      <input type="text" id="c-in" placeholder="比如：奶茶 15，打车 23" aria-label="给助手发消息" maxlength="300">
       <button type="submit" id="c-send" aria-label="发送"></button>
     </form>
   </section>
@@ -254,17 +254,23 @@ details[open] summary::after{transform:rotate(45deg)}
     <div class="me-head"><div class="logo" aria-hidden="true">值</div><div><h1>值不值</h1><p>付钱前问一句，付完记一笔</p></div></div>
 
     <div class="group">
+      <div class="row"><span class="ic" style="--c:#118C7A" data-icon="chat"></span><div class="grow"><label for="prov-sel">用哪家 AI</label><small id="prov-note">在 console.anthropic.com 创建 API key</small></div>
+        <select class="model-sel" id="prov-sel"><option value="claude">Claude</option><option value="openai">GPT（OpenAI）</option><option value="custom">其他（兼容 OpenAI）</option></select></div>
       <div class="krow">
-        <div class="top"><span class="ic" style="--c:#118C7A" data-icon="chat"></span><div class="grow"><label for="key-in">Claude API key</label><small class="muted" id="key-status" style="display:block;font-size:.78rem">还没填</small></div></div>
-        <div class="in-row"><input type="password" id="key-in" placeholder="sk-ant-…" autocomplete="off" spellcheck="false"><button class="btn primary sm" type="button" id="key-save">保存</button></div>
+        <div class="top"><div class="grow"><label for="key-in">API key</label><small class="muted" id="key-status" style="display:block;font-size:.78rem">还没填</small></div></div>
+        <div class="in-row"><input type="password" id="key-in" placeholder="粘贴 API key" autocomplete="off" spellcheck="false"><button class="btn primary sm" type="button" id="key-save">保存</button></div>
       </div>
-      <div class="row"><span class="ic" style="--c:#A066D9" data-icon="star"></span><div class="grow"><label for="model-sel">模型</label><small>Haiku 记一笔大约花不到 1 分钱</small></div>
-        <select class="model-sel" id="model-sel"><option value="claude-haiku-5-5">Haiku 5.5（快、省）</option><option value="claude-sonnet-5-5">Sonnet 5.5（更聪明）</option></select></div>
+      <div class="krow" id="url-box" hidden>
+        <div class="top"><div class="grow"><label for="url-in">接口地址</label><small class="muted" style="display:block;font-size:.78rem">服务商文档里的 base URL，https 开头</small></div></div>
+        <div class="in-row"><input type="text" id="url-in" placeholder="https://…/v1" autocomplete="off" spellcheck="false" inputmode="url"><button class="btn primary sm" type="button" id="url-save">保存</button></div>
+      </div>
+      <div class="row"><span class="ic" style="--c:#A066D9" data-icon="star"></span><div class="grow"><label for="model-sel" id="model-lab">模型</label><small id="model-note">记一笔大约花不到 1 分钱</small></div>
+        <select class="model-sel" id="model-sel"></select><input class="budget-in" id="model-in" type="text" placeholder="模型名" autocomplete="off" spellcheck="false" style="text-align:left;width:9em" hidden></div>
     </div>
-    <p class="fine">在 console.anthropic.com 创建 API key，按用量付费。key 只存在这台手机上。</p>
+    <p class="fine">API 按用量付费，key 只存在这台手机上。</p>
 
     <div class="group">
-      <div class="row"><span class="ic" style="--c:#C99A1E" data-icon="wallet"></span><div class="grow"><label for="budget-in">每月预算</label><small>Claude 判断值不值时会参考</small></div><input class="budget-in" id="budget-in" type="number" inputmode="decimal" min="0" placeholder="未设置"></div>
+      <div class="row"><span class="ic" style="--c:#C99A1E" data-icon="wallet"></span><div class="grow"><label for="budget-in">每月预算</label><small>AI 判断值不值时会参考</small></div><input class="budget-in" id="budget-in" type="number" inputmode="decimal" min="0" placeholder="未设置"></div>
       <div class="row"><span class="ic" style="--c:#2BAE66" data-icon="bell"></span><div class="grow">付款后自动提醒<small id="ls-status">未开启</small></div><button class="btn sm" type="button" id="ls-btn">去开启</button></div>
     </div>
     <p class="fine">开启后，微信支付和支付宝的付款通知一到，值不值就会提醒你记一笔。只看这两个 app 的付款通知，内容只存在手机上。在系统设置里找到「值不值 · 付款识别」打开即可。</p>
@@ -292,7 +298,7 @@ details[open] summary::after{transform:rotate(45deg)}
     <button class="tab" data-tab="home" type="button"><span data-icon="list"></span>明细</button>
     <button class="tab" data-tab="stats" type="button"><span data-icon="pie"></span>统计</button>
     <button class="fab" id="fab" type="button" aria-label="记一笔"><svg width="26" height="26" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" aria-hidden="true"><path d="M12 5v14M5 12h14"/></svg></button>
-    <button class="tab" data-tab="claude" type="button"><span data-icon="chat"></span>Claude</button>
+    <button class="tab" data-tab="claude" type="button"><span data-icon="chat"></span>助手</button>
     <button class="tab" data-tab="me" type="button"><span data-icon="user"></span>我的</button>
   </nav>
   <div class="toast" id="toast" role="status" hidden></div>
@@ -303,7 +309,13 @@ details[open] summary::after{transform:rotate(45deg)}
 <script>
 (function(){
 const NATIVE = typeof window.Android !== 'undefined';
-const DEFAULT_MODEL = 'claude-haiku-5-5';
+
+/* ---------- AI 服务商 ---------- */
+const PROVIDERS = {
+  claude: {name:'Claude', note:'在 console.anthropic.com 创建 API key', models:[['claude-haiku-5-5','Haiku 5.5（快、省）'],['claude-sonnet-5-5','Sonnet 5.5（更聪明）']], cost:'Haiku 记一笔大约花不到 1 分钱', region:'Anthropic 的 API 只在它支持的国家和地区提供'},
+  openai: {name:'GPT', note:'在 platform.openai.com 创建 API key', models:[['gpt-6-luna','GPT-6 Luna（快、省）'],['gpt-6.1-sol','GPT-6.1 Sol（更聪明）']], cost:'Luna 记一笔大约花不到 1 分钱', region:'OpenAI 的 API 只在它支持的国家和地区提供'},
+  custom: {name:'AI', note:'DeepSeek、通义千问、Kimi 等兼容 OpenAI 格式的服务', models:null, cost:'填服务商文档里的模型名', region:'检查一下接口地址对不对'}
+};
 
 /* ---------- 图标 ---------- */
 const P = {
@@ -369,7 +381,7 @@ const byTsDesc = (a, b) => (b.ts > a.ts ? 1 : b.ts < a.ts ? -1 : 0);
 function daysLeft(){ const n = new Date(); return new Date(n.getFullYear(), n.getMonth() + 1, 0).getDate() - n.getDate() + 1; }
 function hm(d){ return pad2(d.getHours()) + ':' + pad2(d.getMinutes()); }
 
-const state = { months:{}, settings:{budget:0, model:DEFAULT_MODEL}, tab:'home', month: monthKey(new Date()), statType:'out', showAll:false, chat:[], review:null, pending:[], ai:false };
+const state = { months:{}, settings:{budget:0, provider:'claude', models:{}}, tab:'home', month: monthKey(new Date()), statType:'out', showAll:false, chat:[], review:null, pending:[], ai:false };
 
 let toastT;
 function toast(msg){ const t = $('#toast'); t.textContent = msg; t.hidden = false; clearTimeout(toastT); toastT = setTimeout(() => { t.hidden = true; }, 2400); }
@@ -380,9 +392,23 @@ const LS_KEY = 'zhibuzhi-v1';
 function loadData(){
   try {
     const raw = NATIVE ? window.Android.load() : localStorage.getItem(LS_KEY);
-    if (raw){ const v = JSON.parse(raw); state.months = v.months || {}; state.settings = Object.assign({budget:0, model:DEFAULT_MODEL}, v.settings || {}); }
+    if (raw){
+      const v = JSON.parse(raw); state.months = v.months || {};
+      const s = Object.assign({budget:0, provider:'claude', models:{}}, v.settings || {});
+      if (s.model && !s.models.claude) s.models = Object.assign({}, s.models, {claude: s.model});
+      delete s.model;
+      state.settings = s;
+    }
   } catch(e){ toast('账本读取失败'); }
 }
+const prov = () => PROVIDERS[state.settings.provider] ? state.settings.provider : 'claude';
+const aiName = () => PROVIDERS[prov()].name;
+function curModel(){
+  const p = prov(); const m = (state.settings.models || {})[p];
+  if (m) return m;
+  return PROVIDERS[p].models ? PROVIDERS[p].models[0][0] : '';
+}
+function setSetting(patch){ state.settings = Object.assign({}, state.settings, patch); persist(); }
 let saveT = null;
 function flush(){
   clearTimeout(saveT); saveT = null;
@@ -415,10 +441,15 @@ function monthData(k){
 
 /* ---------- 原生状态 ---------- */
 function refreshNative(){
-  state.ai = NATIVE && !!window.Android.hasKey();
+  const p = prov();
+  const hasKey = NATIVE && !!window.Android.hasKey(p);
+  const url = NATIVE ? String(window.Android.getCustomUrl() || '') : '';
+  state.ai = hasKey && (p !== 'custom' || (!!url && !!curModel()));
   state.pending = [];
   if (NATIVE){ try { const a = JSON.parse(window.Android.getPending() || '[]'); if (Array.isArray(a)) state.pending = a.sort((x, y) => y.ts - x.ts); } catch(e){} }
-  const ks = $('#key-status'); if (ks) ks.textContent = state.ai ? '已保存：' + window.Android.keyHint() : (NATIVE ? '还没填，填了才能用 Claude' : '在安卓 app 里才能用');
+  const ks = $('#key-status');
+  if (ks) ks.textContent = hasKey ? '已保存：' + window.Android.keyHint(p) : (NATIVE ? '还没填，填了才能用 AI 功能' : '在安卓 app 里才能用');
+  renderAISettings(url);
   if (NATIVE){
     const on = !!window.Android.listenerOn();
     $('#ls-status').textContent = on ? '已开启' : '未开启';
@@ -486,14 +517,14 @@ function renderHome(){
   }
 
   html += `<div class="pill-row">`;
-  if (state.ai) html += `<button class="pill ai" type="button" data-ask="${isCur ? '这个月花得怎么样？哪里该省？' : '帮我看看' + Number(state.month.split('-')[1]) + '月花得怎么样'}">${svg('chat', 16)}问 Claude：${isCur ? '这个月花得怎么样？' : '那个月花得怎么样？'}</button>`;
+  if (state.ai) html += `<button class="pill ai" type="button" data-ask="${isCur ? '这个月花得怎么样？哪里该省？' : '帮我看看' + Number(state.month.split('-')[1]) + '月花得怎么样'}">${svg('chat', 16)}问 ${aiName()}：${isCur ? '这个月花得怎么样？' : '那个月花得怎么样？'}</button>`;
   if (d.savedN) html += `<span class="pill saved">劝住 ${d.savedN} 次 · 省下 ${fmt(d.saved)}</span>`;
   html += `</div>`;
 
   const items = d.items.slice().sort(byTsDesc);
   if (!items.length){
     html += isCur
-      ? `<div class="empty"><b>还没有记账</b><span>点下面的 ＋ 记第一笔，<br>或者去 Claude 那里说"午饭 18"。</span></div>`
+      ? `<div class="empty"><b>还没有记账</b><span>点下面的 ＋ 记第一笔，<br>或者去「助手」那里说"午饭 18"。</span></div>`
       : `<div class="empty"><b>这个月没有记录</b></div>`;
     v.innerHTML = html; return;
   }
@@ -572,8 +603,8 @@ function renderStats(){
     html += `<div class="card"><div class="card-h"><h2>每日支出</h2><span class="muted num" style="font-size:.8rem">日均 ${fmt0(d.out / days)}</span></div><div class="bars">${dayBars(d)}</div></div>`;
   }
   const rv = state.review;
-  html += `<div class="card"><div class="card-h"><h2>Claude 点评</h2>${state.ai ? `<button class="btn ai sm" type="button" id="rev-btn"${rv && rv.busy ? ' disabled' : ''}>${rv && rv.busy ? '正在看…' : '点评这个月'}</button>` : ''}</div>
-    ${rv ? `<div class="review">${esc(rv.text || '正在看你这个月的账…')}</div>` : `<p class="muted" style="margin:0;font-size:.88rem">${state.ai ? '让 Claude 看看这个月钱都花哪了，给下个月定个目标。' : '在「我的」里填上 API key 就能用。'}</p>`}</div>`;
+  html += `<div class="card"><div class="card-h"><h2>${aiName()} 点评</h2>${state.ai ? `<button class="btn ai sm" type="button" id="rev-btn"${rv && rv.busy ? ' disabled' : ''}>${rv && rv.busy ? '正在看…' : '点评这个月'}</button>` : ''}</div>
+    ${rv ? `<div class="review">${esc(rv.text || '正在看你这个月的账…')}</div>` : `<p class="muted" style="margin:0;font-size:.88rem">${state.ai ? `让 ${aiName()} 看看这个月钱都花哪了，给下个月定个目标。` : '在「我的」里填上 API key 就能用。'}</p>`}</div>`;
   v.innerHTML = html;
 }
 $('#v-stats').addEventListener('click', e => {
@@ -585,7 +616,24 @@ function renderData(){
   renderHome(); renderStats();
   if (state.tab === 'claude') renderChat();
   if (document.activeElement !== $('#budget-in')) $('#budget-in').value = state.settings.budget || '';
-  $('#model-sel').value = state.settings.model || DEFAULT_MODEL;
+  $('#chat-title').textContent = aiName() + ' 记账助手';
+}
+function renderAISettings(url){
+  const p = prov(); const cfg = PROVIDERS[p];
+  $('#prov-sel').value = p;
+  $('#prov-note').textContent = cfg.note;
+  $('#url-box').hidden = p !== 'custom';
+  if (p === 'custom' && document.activeElement !== $('#url-in')) $('#url-in').value = url || '';
+  const sel = $('#model-sel'), inp = $('#model-in');
+  if (cfg.models){
+    sel.hidden = false; inp.hidden = true;
+    sel.innerHTML = cfg.models.map(([id, label]) => `<option value="${id}">${label}</option>`).join('');
+    sel.value = curModel();
+  } else {
+    sel.hidden = true; inp.hidden = false;
+    if (document.activeElement !== inp) inp.value = curModel();
+  }
+  $('#model-note').textContent = cfg.cost;
 }
 
 /* ---------- 记账弹层 ---------- */
@@ -610,7 +658,7 @@ function openPending(pid){
 }
 window.__onPayment = id => { refreshNative(); renderHome(); openPending(id); };
 function closeSheet(){
-  if (askCtl) cancelClaude(askCtl);
+  if (askCtl) cancelAI(askCtl);
   sh = null; $('#scrim').hidden = true; $('#sheet').hidden = true; $('#sheet').innerHTML = '';
   if (lastFocus && lastFocus.focus) lastFocus.focus();
 }
@@ -695,7 +743,7 @@ $('#sheet').addEventListener('click', e => {
   if (t.closest('[data-askv]')){ askVerdict(); return; }
   const va = t.closest('[data-v]'); if (va){
     const a = va.dataset.v;
-    if (a === 'stop'){ if (askCtl) cancelClaude(askCtl); sh.v = null; renderSheet(); return; }
+    if (a === 'stop'){ if (askCtl) cancelAI(askCtl); sh.v = null; renderSheet(); return; }
     if (a === 'back'){ sh.v = null; renderSheet(); return; }
     if (a === 'retry'){ askVerdict(); return; }
     if (a === 'buy') saveSheet(); else if (a === 'skip') saveSheet('skipped');
@@ -709,14 +757,21 @@ window.__onBack = () => {
   return false;
 };
 
-/* ---------- 调用 Claude（通过手机端的 Android.ask） ---------- */
+/* ---------- 调用 AI（通过手机端的 Android.ask） ---------- */
 const calls = {};
-window.__onClaude = function(id, ok, payload){
+function replyText(j, provider){
+  if (provider === 'claude') return (j.content || []).filter(b => b.type === 'text').map(b => b.text).join('').trim();
+  const msg = j.choices && j.choices[0] && j.choices[0].message;
+  if (!msg) return '';
+  if (typeof msg.content === 'string') return msg.content.trim();
+  if (Array.isArray(msg.content)) return msg.content.map(p => (p && (p.text || '')) || '').join('').trim();
+  return '';
+}
+window.__onAI = function(id, ok, payload){
   const c = calls[id]; if (!c) return; delete calls[id];
   if (ok){
     try {
-      const j = JSON.parse(payload);
-      const text = (j.content || []).filter(b => b.type === 'text').map(b => b.text).join('').trim();
+      const text = replyText(JSON.parse(payload), c.provider);
       if (text) c.resolve(text); else c.reject({status:-1, message:'empty'});
     } catch(e){ c.reject({status:-1, message:'parse'}); }
     return;
@@ -728,18 +783,27 @@ window.__onClaude = function(id, ok, payload){
   } catch(_){}
   c.reject(err);
 };
-function callClaude(opts, ctl){
+function callAI(opts, ctl){
   return new Promise((resolve, reject) => {
-    if (!NATIVE || !window.Android.hasKey()){ reject({code:'nokey'}); return; }
-    const id = 'q' + uid8(); calls[id] = {resolve, reject};
+    const provider = prov();
+    if (!NATIVE || !window.Android.hasKey(provider)){ reject({code:'nokey'}); return; }
+    const model = curModel();
+    if (!model){ reject({code:'nomodel'}); return; }
+    const id = 'q' + uid8(); calls[id] = {resolve, reject, provider};
     if (ctl) ctl.id = id;
-    const body = {model: state.settings.model || DEFAULT_MODEL, max_tokens: opts.max_tokens || 2000, messages: opts.messages};
-    if (opts.system) body.system = opts.system;
-    try { window.Android.ask(id, JSON.stringify(body)); }
+    let body;
+    if (provider === 'claude'){
+      body = {model, max_tokens: opts.max_tokens || 2000, messages: opts.messages};
+      if (opts.system) body.system = opts.system;
+    } else {
+      // OpenAI 格式：system 作为第一条消息；不传 token 上限，交给服务商默认值
+      body = {model, messages: (opts.system ? [{role:'system', content: opts.system}] : []).concat(opts.messages)};
+    }
+    try { window.Android.ask(id, provider, JSON.stringify(body)); }
     catch(e){ delete calls[id]; reject({status:0, message:String(e)}); }
   });
 }
-function cancelClaude(ctl){ const c = ctl && calls[ctl.id]; if (c){ delete calls[ctl.id]; c.reject({code:'cancelled'}); } }
+function cancelAI(ctl){ const c = ctl && calls[ctl.id]; if (c){ delete calls[ctl.id]; c.reject({code:'cancelled'}); } }
 function looseJSON(t){
   try { return JSON.parse(t); } catch(e){}
   const f = t.match(/```(?:json)?\s*([\s\S]*?)```/); if (f){ try { return JSON.parse(f[1]); } catch(e){} }
@@ -748,15 +812,19 @@ function looseJSON(t){
 }
 function aiErr(e){
   if (!e) return '出错了，再试一次。';
-  if (e.code === 'nokey' || e.message === 'nokey') return '先在「我的」里填上 API key。';
-  const s = e.status, msg = String(e.message || '');
-  if (s === 0) return '连不上 Claude 的服务器（api.anthropic.com）。检查一下网络；另外 Anthropic 的 API 只在它支持的国家和地区提供。';
+  const msg = String(e.message || '');
+  if (e.code === 'nokey' || msg === 'nokey') return '先在「我的」里填上 API key。';
+  if (e.code === 'nomodel') return '先在「我的」里填上模型名。';
+  if (msg === 'nourl') return '先在「我的」里填上接口地址。';
+  if (msg === 'nohttps') return '接口地址要以 https:// 开头。';
+  const s = e.status; const cfg = PROVIDERS[prov()];
+  if (s === 0) return `连不上 ${cfg.name} 的服务器。检查一下网络；另外，${cfg.region}。`;
   if (s === 401) return 'API key 不对，去「我的」里检查一下。';
+  if (/credit|balance|quota|insufficient|余额/i.test(msg)) return 'API 余额不足，去服务商后台充值后再试。';
   if (s === 403) return '这个 API key 没有权限，或者当前地区不能使用。';
-  if (s === 400 && /credit|balance/i.test(msg)) return 'API 余额不足，去 console.anthropic.com 充值后再试。';
-  if (s === 404) return '找不到这个模型，去「我的」里换一个试试。';
+  if (s === 404) return '找不到这个模型或接口，去「我的」里检查模型名和地址。';
   if (s === 429) return '请求太频繁或到了用量上限，等一会再试。';
-  if (s >= 500) return 'Claude 现在太忙了，等一会再试。';
+  if (s >= 500) return `${cfg.name} 现在太忙了，等一会再试。`;
   if (s === -1) return '这次没拿到结果，再试一次。';
   return '出错了：' + msg.slice(0, 80);
 }
@@ -779,7 +847,7 @@ ${lines}
 let askCtl = null;
 async function askVerdict(){
   readSheet(); const a = needAmount(); if (!a) return;
-  if (!sh.note){ hint('写上买什么，Claude 才好判断'); const n = $('#sh-note'); if (n) n.focus(); return; }
+  if (!sh.note){ hint(`写上买什么，${aiName()} 才好判断`);const n = $('#sh-note'); if (n) n.focus(); return; }
   sh.v = {phase:'wait'}; renderSheet();
   const ctl = askCtl = {};
   const d = monthData(monthKey(new Date())); const b = state.settings.budget || 0;
@@ -798,7 +866,7 @@ async function askVerdict(){
 只回复一个 JSON 对象，不要别的文字：
 {"verdict":"值" 或 "再想想" 或 "不值","score":1到10的整数（10 最值）,"summary":"一句话结论，20 字以内","reasons":["2 到 3 条理由，每条 25 字以内"],"tip":"一条具体建议，比如更便宜的替代、等活动、先放购物车 48 小时，30 字以内"}`;
   try {
-    const text = await callClaude({system:'你是帮学生管住钱包的朋友，说话直接、具体，不说教。', messages:[{role:'user', content: prompt}], max_tokens: 1500}, ctl);
+    const text = await callAI({system:'你是帮学生管住钱包的朋友，说话直接、具体，不说教。', messages:[{role:'user', content: prompt}], max_tokens: 1500}, ctl);
     if (!sh || askCtl !== ctl) return;
     const o = looseJSON(text) || {};
     let v = String(o.verdict || '').trim(); if (!['值','再想想','不值'].includes(v)) v = /不值/.test(v) ? '不值' : '再想想';
@@ -813,7 +881,7 @@ async function askVerdict(){
 }
 function verdictHTML(){
   const v = sh.v; const item = `${esc(sh.note)} · ${fmt(parseFloat(sh.amt) || 0)}`;
-  if (v.phase === 'wait') return `<div class="verdict"><div class="v-top v-wait"><div class="stamp">想想…</div><div><div class="v-sum">Claude 正在看这笔钱</div><div class="v-item">${item}</div></div></div><button class="btn" type="button" data-v="stop">停止</button></div>`;
+  if (v.phase === 'wait') return `<div class="verdict"><div class="v-top v-wait"><div class="stamp">想想…</div><div><div class="v-sum">${aiName()} 正在看这笔钱</div><div class="v-item">${item}</div></div></div><button class="btn" type="button" data-v="stop">停止</button></div>`;
   if (v.phase === 'error') return `<div class="verdict"><p class="hint">${esc(v.msg)}</p><div class="v-act"><button class="btn ai" type="button" data-v="retry">再问一次</button><button class="btn primary" type="button" data-v="buy">直接记一笔</button></div><button class="txtbtn" type="button" data-v="back" style="align-self:center">返回</button></div>`;
   const cls = v.verdict === '值' ? 'v-good' : v.verdict === '不值' ? 'v-bad' : 'v-warn';
   return `<div class="verdict"><div class="v-top ${cls}"><div class="stamp">${esc(v.verdict)}</div><div><div class="score"><b>${v.score}</b> / 10</div><div class="v-sum">${esc(v.summary)}</div><div class="v-item">${item}</div></div></div>
@@ -832,7 +900,7 @@ function renderChat(){
   let html = '';
   if (!state.chat.length){
     html += off
-      ? `<div class="intro"><div>填上你的 Claude API key 后，我就能帮你记账、查账、判断值不值。</div><button class="btn primary" type="button" data-gokey>去填写</button></div>`
+      ? `<div class="intro"><div>在「我的」里选好 AI 服务商、填上 API key，我就能帮你记账、查账、判断值不值。</div><button class="btn primary" type="button" data-gokey>去填写</button></div>`
       : `<div class="intro"><div>我是你的记账助手。可以直接跟我说：</div><div class="sugg">${SUGG.map(s => `<button type="button" data-sugg="${esc(s)}">${esc(s)}</button>`).join('')}</div><div class="muted" style="font-size:.82rem">我能看到你的账本，记下的每一笔都会出现在明细里。</div></div>`;
   }
   for (const msg of state.chat){
@@ -870,7 +938,7 @@ async function sendChat(text){
   state.chat.push({role:'user', text});
   const bot = {role:'assistant', wait:true}; state.chat.push(bot);
   renderChat();
-  const system = `你是「值不值」记账 app 里的 Claude 记账助手，用户是学生。说话像朋友，简短直接，不说教。
+  const system = `你是「值不值」记账 app 里的记账助手，用户是学生。说话像朋友，简短直接，不说教。
 你能做三件事：
 1. 记账：用户说花了或收到多少钱（比如"午饭 18""奶茶15""妈给了生活费 2000"），就放进 records。一句话里有几笔就放几笔。金额不清楚时不要记，先问。
 2. 查账和分析：按下面的账本数据回答，数字要准确，不要编造账本里没有的记录。
@@ -888,7 +956,7 @@ ${ledgerContext()}`;
   while (hist.length && hist[0].role !== 'user') hist.shift();
   const messages = hist.map(h => ({role: h.role === 'user' ? 'user' : 'assistant', content: h.text}));
   try {
-    const out = await callClaude({system, messages, max_tokens: 2000});
+    const out = await callAI({system, messages, max_tokens: 2000});
     const o = looseJSON(out);
     const recs = o && Array.isArray(o.records) ? o.records.map(normRec).filter(Boolean).slice(0, 10) : [];
     bot.wait = false;
@@ -920,22 +988,37 @@ ${top}
 要求：中文纯文本，不要用 # 或 ** 之类的 Markdown 符号。先一句话总评；然后 3 到 5 条以"• "开头的具体观察或建议，每条不超过 40 字；最后一句给下个月定一个具体的金额目标。`;
   state.review = {busy:true, text:''}; renderStats();
   try {
-    const text = await callClaude({system:'你是帮学生管钱的朋友，说话直接、具体，不说教。', messages:[{role:'user', content: prompt}], max_tokens: 2500});
+    const text = await callAI({system:'你是帮学生管钱的朋友，说话直接、具体，不说教。', messages:[{role:'user', content: prompt}], max_tokens: 2500});
     state.review = {busy:false, text};
   } catch(e){ state.review = {busy:false, text: aiErr(e)}; }
   renderStats();
 }
 
 /* ---------- 我的 ---------- */
+function aiChanged(){ refreshNative(); renderData(); renderChat(); }
+$('#prov-sel').addEventListener('change', e => {
+  setSetting({provider: e.target.value}); $('#key-in').value = '';
+  state.chat = []; state.review = null;
+  aiChanged(); toast('已切换到 ' + aiName());
+});
 $('#key-save').addEventListener('click', () => {
   if (!NATIVE){ toast('在安卓 app 里才能保存'); return; }
   const k = $('#key-in').value.trim();
-  if (k && !/^sk-/.test(k)){ toast('看起来不像 API key，应该以 sk- 开头'); return; }
-  window.Android.setKey(k); $('#key-in').value = '';
-  refreshNative(); renderData(); renderChat();
+  if (k && /\s/.test(k)){ toast('key 里不能有空格，重新复制一下'); return; }
+  if (k && prov() !== 'custom' && !/^sk-/.test(k)){ toast('看起来不像 API key，应该以 sk- 开头'); return; }
+  window.Android.setKey(prov(), k); $('#key-in').value = '';
+  aiChanged();
   toast(k ? 'API key 已保存' : '已清除 API key');
 });
-$('#model-sel').addEventListener('change', e => { state.settings = Object.assign({}, state.settings, {model: e.target.value}); persist(); toast('已切换模型'); });
+$('#url-save').addEventListener('click', () => {
+  if (!NATIVE){ toast('在安卓 app 里才能保存'); return; }
+  const u = $('#url-in').value.trim();
+  if (u && !/^https:\/\/[^\s]+$/i.test(u)){ toast('地址要以 https:// 开头'); return; }
+  window.Android.setCustomUrl(u);
+  aiChanged(); toast(u ? '接口地址已保存' : '已清除接口地址');
+});
+$('#model-sel').addEventListener('change', e => { setSetting({models: Object.assign({}, state.settings.models, {[prov()]: e.target.value})}); toast('已切换模型'); });
+$('#model-in').addEventListener('change', e => { setSetting({models: Object.assign({}, state.settings.models, {[prov()]: e.target.value.trim()})}); aiChanged(); toast('模型名已保存'); });
 $('#budget-in').addEventListener('change', () => {
   const v = parseFloat($('#budget-in').value);
   state.settings = Object.assign({}, state.settings, {budget: v > 0 ? Math.round(v) : 0});
