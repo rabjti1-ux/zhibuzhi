@@ -1,0 +1,1078 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no">
+<title>值不值</title>
+<style>
+/* 一屏 app：上面是可滚动的页面，下面是带 ＋ 的五格导航；记账在底部弹层里用数字键盘完成 */
+:root{
+  --bg:#F2F3F5; --surface:#FFFFFF; --sunk:#EBEDF0; --ink:#15181D; --muted:#6A717D; --faint:#A2A8B2; --line:#E2E5EA;
+  --accent:#118C7A; --accent-ink:#FFFFFF; --accent-soft:#DCF1EC;
+  --hero:#0E7A6A; --hero-ink:#FFFFFF; --hero-sub:rgba(255,255,255,.74); --hero-track:rgba(255,255,255,.24);
+  --in:#118C7A; --good:#118C7A; --warn:#BD7A0C; --bad:#D6453A;
+  --shadow:0 1px 2px rgba(17,24,39,.05),0 8px 24px rgba(17,24,39,.06);
+  --scrim:rgba(10,14,20,.38);
+  --font:"PingFang SC","Noto Sans CJK SC","Source Han Sans SC","Microsoft YaHei",system-ui,sans-serif;
+  --num:Roboto,"SF Pro Text",system-ui,sans-serif;
+  --stamp:"Noto Serif CJK SC","Source Han Serif SC","Songti SC",serif;
+  color-scheme:light;
+}
+@media (prefers-color-scheme: dark){
+  :root{
+    --bg:#0B0D10; --surface:#16191E; --sunk:#20242B; --ink:#ECEEF1; --muted:#9AA2AE; --faint:#646B76; --line:#262A31;
+    --accent:#2FC2AA; --accent-ink:#06120F; --accent-soft:#10302A;
+    --hero:#12665A; --hero-ink:#F1FFFB; --hero-sub:rgba(241,255,251,.7); --hero-track:rgba(241,255,251,.2);
+    --in:#2FC2AA; --good:#2FC2AA; --warn:#F0A93C; --bad:#FF6B5E;
+    --shadow:0 0 0 1px rgba(255,255,255,.04); --scrim:rgba(0,0,0,.55); color-scheme:dark;
+  }
+}
+*{box-sizing:border-box}
+[hidden]{display:none!important}
+html,body{height:100%;margin:0}
+html{-webkit-text-size-adjust:100%}
+body{background:var(--bg);color:var(--ink);font-family:var(--font);font-size:15px;line-height:1.5;-webkit-tap-highlight-color:transparent;overflow:hidden;-webkit-user-select:none;user-select:none}
+input,textarea{-webkit-user-select:text;user-select:text}
+button,input,select,textarea{font:inherit;color:inherit}
+button{cursor:pointer}
+:focus-visible{outline:2px solid var(--accent);outline-offset:2px}
+.num{font-family:var(--num);font-variant-numeric:tabular-nums}
+
+.app{height:100%;max-width:480px;margin:0 auto;display:flex;flex-direction:column;position:relative}
+.view{flex:1;min-height:0;overflow-y:auto;padding:10px 16px 28px;display:flex;flex-direction:column;gap:14px}
+
+.mbar{display:flex;align-items:center;justify-content:space-between;gap:8px;padding:4px 0}
+.mbar h1{margin:0;font-size:1.15rem;font-weight:700;letter-spacing:.02em}
+.mbar .mnav{display:flex;gap:4px}
+.iconbtn{width:36px;height:36px;border-radius:12px;border:0;background:var(--surface);color:var(--ink);display:grid;place-items:center;box-shadow:var(--shadow)}
+.iconbtn:disabled{opacity:.35}
+
+.hero{background:var(--hero);color:var(--hero-ink);border-radius:24px;padding:20px 20px 18px;display:flex;flex-direction:column;gap:16px;position:relative;overflow:hidden}
+.hero::before{content:"";position:absolute;inset:0;background:radial-gradient(120% 90% at 100% 0%,rgba(255,255,255,.16),transparent 55%);pointer-events:none}
+.hero>*{position:relative}
+.h-lab{font-size:.84rem;color:var(--hero-sub)}
+.h-amt{font-family:var(--num);font-variant-numeric:tabular-nums;font-weight:800;font-size:2.7rem;line-height:1;letter-spacing:-.02em;margin-top:6px}
+.h-amt small{font-size:.48em;font-weight:700;opacity:.8;margin-left:1px}
+.h-row{display:grid;grid-template-columns:1fr 1fr;gap:12px}
+.h-row div{display:flex;flex-direction:column;gap:2px;min-width:0}
+.h-row span{font-size:.78rem;color:var(--hero-sub)}
+.h-row b{font-family:var(--num);font-variant-numeric:tabular-nums;font-weight:700;font-size:1.05rem}
+.h-bud{display:flex;flex-direction:column;gap:6px}
+.h-track{height:6px;background:var(--hero-track);border-radius:3px;overflow:hidden}
+.h-track i{display:block;height:100%;background:var(--hero-ink);border-radius:3px;transition:width .5s ease}
+.h-btxt{font-size:.8rem;color:var(--hero-sub)}
+.h-btxt b{color:var(--hero-ink);font-family:var(--num);font-weight:700}
+.h-set{align-self:flex-start;background:var(--hero-track);color:var(--hero-ink);border:0;border-radius:999px;padding:5px 12px;font-size:.82rem}
+
+.pill-row{display:flex;gap:8px;flex-wrap:wrap}
+.pill{display:inline-flex;align-items:center;gap:6px;border:0;border-radius:999px;padding:7px 12px;font-size:.85rem;background:var(--surface);color:var(--ink);box-shadow:var(--shadow)}
+.pill.ai{color:var(--accent)}
+.pill.saved{background:var(--accent-soft);color:var(--good);box-shadow:none}
+
+.day{background:var(--surface);border-radius:20px;padding:4px 10px 6px;box-shadow:var(--shadow)}
+.day-h{display:flex;justify-content:space-between;gap:8px;font-size:.78rem;color:var(--muted);padding:10px 6px 4px}
+.rec{display:grid;grid-template-columns:42px 1fr auto;gap:12px;align-items:center;width:100%;padding:9px 6px;background:none;border:0;text-align:left;border-radius:14px}
+.rec:active{background:var(--sunk)}
+.ic{width:42px;height:42px;border-radius:14px;display:grid;place-items:center;background:color-mix(in srgb,var(--c) 15%,transparent);color:var(--c);flex:none}
+.r-main{min-width:0}
+.r-name{display:block;font-weight:500;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.r-meta{font-size:.76rem;color:var(--muted);display:flex;gap:6px;align-items:center;white-space:nowrap;overflow:hidden}
+.r-amt{font-family:var(--num);font-variant-numeric:tabular-nums;font-weight:700;font-size:1rem;white-space:nowrap}
+.r-amt.in{color:var(--in)}
+.rec.skip .r-amt{text-decoration:line-through;color:var(--faint)}
+.tag{font-size:.68rem;padding:0 6px;border-radius:999px;border:1px solid currentColor;line-height:1.55;flex:none}
+.tag.g{color:var(--good)} .tag.w{color:var(--warn)} .tag.b{color:var(--bad)}
+.empty{background:var(--surface);border-radius:20px;padding:28px 20px;text-align:center;color:var(--muted);box-shadow:var(--shadow);display:flex;flex-direction:column;gap:6px;align-items:center}
+.empty b{color:var(--ink);font-size:1rem}
+.more{align-self:center;border:0;background:none;color:var(--accent);font-weight:600;padding:6px 12px}
+
+/* 检测到的付款 */
+.pend{border:1.5px solid var(--accent)}
+.prow{display:grid;grid-template-columns:42px 1fr auto;gap:4px 12px;align-items:center;padding:6px 0}
+.prow+.prow{border-top:1px solid var(--line);padding-top:10px}
+.p-act{grid-column:2/-1;display:flex;gap:8px;justify-content:flex-end}
+.btn.sm{padding:7px 14px;font-size:.85rem;border-radius:11px}
+
+.tabbar{flex:none;display:grid;grid-template-columns:repeat(5,1fr);align-items:end;background:var(--surface);border-top:1px solid var(--line);padding:6px 8px}
+.tab{border:0;background:none;display:flex;flex-direction:column;align-items:center;gap:2px;font-size:.7rem;color:var(--faint);padding:4px 0}
+.tab[aria-current="page"]{color:var(--accent);font-weight:600}
+.fab{justify-self:center;width:56px;height:56px;border-radius:20px;border:0;background:var(--accent);color:var(--accent-ink);display:grid;place-items:center;margin-top:-26px;box-shadow:0 8px 20px color-mix(in srgb,var(--accent) 40%,transparent)}
+.fab:active{transform:scale(.96)}
+
+.scrim{position:fixed;inset:0;background:var(--scrim);z-index:30;animation:fade .2s ease}
+.sheet{position:fixed;left:0;right:0;bottom:0;margin:0 auto;max-width:480px;max-height:94%;overflow-y:auto;background:var(--surface);border-radius:26px 26px 0 0;z-index:31;padding:8px 16px 14px;display:flex;flex-direction:column;gap:12px;animation:up .28s cubic-bezier(.2,.9,.3,1)}
+@keyframes up{from{transform:translateY(40%);opacity:0}to{transform:none;opacity:1}}
+@keyframes fade{from{opacity:0}}
+.grab{width:38px;height:5px;border-radius:3px;background:var(--line);align-self:center}
+.sh-head{display:flex;justify-content:space-between;align-items:center;gap:8px}
+.sh-src{font-size:.8rem;color:var(--accent);text-align:right}
+.seg{display:inline-flex;background:var(--sunk);border-radius:12px;padding:3px}
+.seg button{border:0;background:none;border-radius:10px;padding:6px 16px;font-size:.9rem;color:var(--muted)}
+.seg button[aria-pressed="true"]{background:var(--surface);color:var(--ink);font-weight:600;box-shadow:0 1px 3px rgba(0,0,0,.08)}
+.txtbtn{border:0;background:none;color:var(--muted);padding:6px 4px}
+.sh-amt{display:flex;align-items:baseline;justify-content:flex-end;gap:4px;padding:2px 4px;min-height:3.4rem}
+.sh-amt .cur{font-family:var(--num);font-size:1.4rem;font-weight:700;color:var(--muted)}
+.sh-amt .val{font-family:var(--num);font-variant-numeric:tabular-nums;font-size:2.8rem;font-weight:800;letter-spacing:-.02em;line-height:1.1}
+.sh-amt .val.ph{color:var(--faint)}
+.sh-amt.shake{animation:shake .3s}
+@keyframes shake{25%{transform:translateX(-6px)}75%{transform:translateX(6px)}}
+.cgrid{display:grid;grid-template-columns:repeat(5,1fr);gap:8px 4px}
+.cbtn{border:0;background:none;display:flex;flex-direction:column;align-items:center;gap:4px;font-size:.72rem;color:var(--muted);padding:2px 0}
+.cbtn .ic{width:44px;height:44px}
+.cbtn[aria-pressed="true"]{color:var(--ink);font-weight:600}
+.cbtn[aria-pressed="true"] .ic{background:var(--c);color:#fff}
+.sh-row{display:flex;gap:8px;align-items:center}
+.sh-row input[type=text]{flex:1;min-width:0;background:var(--sunk);border:0;border-radius:12px;padding:10px 12px;font-size:16px}
+.date-in{background:var(--sunk);border:0;border-radius:12px;padding:9px 10px;font-size:14px;max-width:9.5em;color:var(--ink)}
+.pad{display:grid;grid-template-columns:repeat(3,1fr);gap:8px}
+.key{height:50px;border:0;border-radius:14px;background:var(--sunk);font-family:var(--num);font-size:1.35rem;font-weight:600;display:grid;place-items:center}
+.key:active{background:var(--line)}
+.sh-act{display:grid;grid-template-columns:1fr 1.4fr;gap:10px}
+.btn{border:0;border-radius:14px;padding:13px 14px;font-weight:700;font-size:.98rem;background:var(--sunk);color:var(--ink);display:inline-flex;align-items:center;justify-content:center;gap:6px}
+.btn.primary{background:var(--accent);color:var(--accent-ink)}
+.btn.ai{background:var(--accent-soft);color:var(--accent)}
+.btn.danger{color:var(--bad)}
+.btn:disabled{opacity:.5}
+.hint{color:var(--bad);font-size:.84rem;margin:0;text-align:center}
+
+.verdict{display:flex;flex-direction:column;gap:12px;padding:4px 0}
+.v-top{display:grid;grid-template-columns:auto 1fr;gap:18px;align-items:center}
+.v-top>div{min-width:0}
+.v-good{--v:var(--good)} .v-warn{--v:var(--warn)} .v-bad{--v:var(--bad)} .v-wait{--v:var(--faint)}
+.stamp{font-family:var(--stamp);font-weight:900;font-size:2.1rem;line-height:1;color:var(--v);border:3px solid var(--v);border-radius:10px;padding:10px 13px 8px;transform:rotate(-9deg);box-shadow:inset 0 0 0 3px var(--surface),inset 0 0 0 5px var(--v);white-space:nowrap;letter-spacing:.06em;animation:slam .35s cubic-bezier(.2,1.4,.4,1) both}
+.v-wait .stamp{border-style:dashed;box-shadow:none;font-size:1.4rem;animation:pulse 1.2s ease-in-out infinite}
+@keyframes slam{from{transform:rotate(-9deg) scale(1.7);opacity:0}to{transform:rotate(-9deg) scale(1);opacity:1}}
+@keyframes pulse{50%{opacity:.4}}
+.score{font-family:var(--num);font-size:.85rem;color:var(--muted)}
+.score b{font-size:1.5rem;color:var(--v);font-weight:800}
+.v-sum{font-weight:700;font-size:1.02rem}
+.v-item{font-size:.82rem;color:var(--muted);overflow-wrap:anywhere}
+.reasons{margin:0;padding-left:1.2em;display:flex;flex-direction:column;gap:4px;font-size:.93rem}
+.tip{background:var(--sunk);border-radius:12px;padding:10px 12px;font-size:.9rem}
+.tip span{font-size:.72rem;color:var(--muted);letter-spacing:.08em;display:block}
+.v-act{display:grid;grid-template-columns:1fr 1fr;gap:10px}
+
+.card{background:var(--surface);border-radius:20px;padding:16px;box-shadow:var(--shadow);display:flex;flex-direction:column;gap:12px}
+.card h2{margin:0;font-size:.98rem;font-weight:700}
+.card-h{display:flex;justify-content:space-between;align-items:center;gap:8px}
+.donut{display:grid;place-items:center}
+.donut svg{width:190px;height:190px;max-width:100%}
+.donut text{fill:var(--ink)}
+.donut .sub{fill:var(--muted)}
+.legend{display:flex;flex-direction:column;gap:10px}
+.lg{display:grid;grid-template-columns:34px 1fr auto;gap:10px;align-items:center}
+.lg .ic{width:34px;height:34px;border-radius:11px}
+.lg-mid{min-width:0;display:flex;flex-direction:column;gap:4px}
+.lg-top{display:flex;justify-content:space-between;gap:8px;font-size:.88rem}
+.lg-top span:last-child{color:var(--muted);font-family:var(--num)}
+.lg-bar{height:5px;background:var(--sunk);border-radius:3px;overflow:hidden}
+.lg-bar i{display:block;height:100%;background:var(--c);border-radius:3px}
+.lg-amt{font-family:var(--num);font-variant-numeric:tabular-nums;font-weight:700;font-size:.92rem;min-width:5.5em;text-align:right}
+.bars svg{width:100%;height:auto;display:block}
+.bars .b{fill:var(--accent);opacity:.35}
+.bars .b.today{opacity:1}
+.bars .ax{fill:var(--muted);font-family:var(--num);font-size:9px}
+.bars .grid{stroke:var(--line);stroke-width:1}
+.review{white-space:pre-wrap;font-size:.93rem;background:var(--sunk);border-radius:14px;padding:12px;-webkit-user-select:text;user-select:text}
+
+.chat{padding:0;gap:0}
+.chat-top{padding:12px 16px 8px;display:flex;align-items:center;gap:10px;border-bottom:1px solid var(--line)}
+.chat-top .ic{--c:var(--accent);width:36px;height:36px;border-radius:12px}
+.chat-top h1{margin:0;font-size:1.02rem}
+.chat-top p{margin:0;font-size:.76rem;color:var(--muted)}
+.msgs{flex:1;min-height:0;overflow-y:auto;padding:14px 16px;display:flex;flex-direction:column;gap:10px}
+.msg{max-width:86%;padding:10px 13px;border-radius:18px;white-space:pre-wrap;overflow-wrap:anywhere;font-size:.95rem;-webkit-user-select:text;user-select:text}
+.msg.me{align-self:flex-end;background:var(--accent);color:var(--accent-ink);border-bottom-right-radius:6px}
+.msg.bot{align-self:flex-start;background:var(--surface);border-bottom-left-radius:6px;box-shadow:var(--shadow);display:flex;flex-direction:column;gap:8px}
+.msg.bot.wait{color:var(--muted)}
+.msg.err{color:var(--bad)}
+.rcard{display:grid;grid-template-columns:30px 1fr auto auto;gap:8px;align-items:center;background:var(--sunk);border-radius:12px;padding:6px 8px;white-space:normal}
+.rcard .ic{width:30px;height:30px;border-radius:9px}
+.rcard .n{font-size:.84rem;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.rcard .a{font-family:var(--num);font-weight:700;font-size:.86rem}
+.rcard button{border:0;background:none;color:var(--muted);font-size:.78rem;padding:2px 4px}
+.rcard.undone{opacity:.45}
+.rcard.undone .n,.rcard.undone .a{text-decoration:line-through}
+.intro{background:var(--surface);border-radius:18px;padding:14px;box-shadow:var(--shadow);font-size:.92rem;display:flex;flex-direction:column;gap:10px}
+.sugg{display:flex;flex-wrap:wrap;gap:8px}
+.sugg button{border:1px solid var(--line);background:var(--surface);border-radius:999px;padding:6px 12px;font-size:.84rem}
+.composer{display:flex;gap:8px;padding:8px 16px 10px;border-top:1px solid var(--line);background:var(--bg)}
+.composer input{flex:1;min-width:0;background:var(--surface);border:1px solid var(--line);border-radius:14px;padding:11px 14px;font-size:16px}
+.composer button{width:46px;border:0;border-radius:14px;background:var(--accent);color:var(--accent-ink);display:grid;place-items:center}
+.composer button:disabled{opacity:.45}
+
+.group{background:var(--surface);border-radius:20px;box-shadow:var(--shadow);overflow:hidden}
+.group>*+*{border-top:1px solid var(--line)}
+.row{display:flex;align-items:center;gap:12px;padding:14px 16px}
+.row .ic{width:34px;height:34px;border-radius:11px}
+.row .grow{flex:1;min-width:0}
+.row small{display:block;color:var(--muted);font-size:.78rem}
+.krow{padding:14px 16px;display:flex;flex-direction:column;gap:10px}
+.krow .top{display:flex;align-items:center;gap:12px}
+.krow .ic{width:34px;height:34px;border-radius:11px}
+.krow .in-row{display:flex;gap:8px}
+.krow input{flex:1;min-width:0;background:var(--sunk);border:0;border-radius:10px;padding:9px 12px;font-size:15px;font-family:var(--num)}
+.budget-in{width:7.5em;background:var(--sunk);border:0;border-radius:10px;padding:8px 10px;font-family:var(--num);font-size:16px;text-align:right}
+.model-sel{background:var(--sunk);border:0;border-radius:10px;padding:8px 10px;font-size:14px;max-width:11em}
+details summary{list-style:none;display:flex;align-items:center;gap:12px;padding:14px 16px;cursor:pointer}
+details summary::-webkit-details-marker{display:none}
+details summary .ic{width:34px;height:34px;border-radius:11px}
+details summary .grow{flex:1}
+details summary::after{content:"";width:8px;height:8px;border-right:2px solid var(--faint);border-bottom:2px solid var(--faint);transform:rotate(-45deg);transition:transform .2s}
+details[open] summary::after{transform:rotate(45deg)}
+.d-body{padding:0 16px 16px;display:flex;flex-direction:column;gap:10px;font-size:.9rem}
+.d-body p{margin:0}
+.d-body ol{margin:0;padding-left:1.3em;display:flex;flex-direction:column;gap:4px}
+.muted{color:var(--muted)}
+.fine{font-size:.8rem;color:var(--muted);margin:0;padding:0 4px}
+.filebtn{position:relative;overflow:hidden;align-self:flex-start}
+.filebtn input{position:absolute;inset:0;opacity:0}
+.on{color:var(--good)!important}
+.me-head{display:flex;align-items:center;gap:12px;padding:6px 2px}
+.logo{width:52px;height:52px;border-radius:16px;background:var(--hero);color:var(--hero-ink);display:grid;place-items:center;font-family:var(--stamp);font-weight:900;font-size:1.5rem;transform:rotate(-6deg)}
+.me-head h1{margin:0;font-size:1.25rem}
+.me-head p{margin:0;font-size:.82rem;color:var(--muted)}
+
+.toast{position:absolute;left:50%;bottom:86px;transform:translateX(-50%);background:var(--ink);color:var(--bg);padding:10px 16px;border-radius:12px;font-size:.9rem;max-width:calc(100% - 32px);z-index:40;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+@media (prefers-reduced-motion: reduce){*{animation:none!important;transition:none!important}}
+@media (max-width:360px){.h-amt{font-size:2.3rem}.sh-amt .val{font-size:2.4rem}.key{height:46px}}
+</style>
+</head>
+<body>
+<div class="app">
+  <section class="view" id="v-home" aria-label="明细"></section>
+  <section class="view" id="v-stats" aria-label="统计" hidden></section>
+  <section class="view chat" id="v-claude" aria-label="Claude 助手" hidden>
+    <div class="chat-top"><span class="ic" id="chat-ic"></span><div><h1>Claude 记账助手</h1><p id="chat-sub">说"午饭 18"就能记一笔，也可以问账、问值不值</p></div></div>
+    <div class="msgs" id="msgs" aria-live="polite"></div>
+    <form class="composer" id="composer" autocomplete="off">
+      <input type="text" id="c-in" placeholder="比如：奶茶 15，打车 23" aria-label="给 Claude 发消息" maxlength="300">
+      <button type="submit" id="c-send" aria-label="发送"></button>
+    </form>
+  </section>
+  <section class="view" id="v-me" aria-label="我的" hidden>
+    <div class="me-head"><div class="logo" aria-hidden="true">值</div><div><h1>值不值</h1><p>付钱前问一句，付完记一笔</p></div></div>
+
+    <div class="group">
+      <div class="krow">
+        <div class="top"><span class="ic" style="--c:#118C7A" data-icon="chat"></span><div class="grow"><label for="key-in">Claude API key</label><small class="muted" id="key-status" style="display:block;font-size:.78rem">还没填</small></div></div>
+        <div class="in-row"><input type="password" id="key-in" placeholder="sk-ant-…" autocomplete="off" spellcheck="false"><button class="btn primary sm" type="button" id="key-save">保存</button></div>
+      </div>
+      <div class="row"><span class="ic" style="--c:#A066D9" data-icon="star"></span><div class="grow"><label for="model-sel">模型</label><small>Haiku 记一笔大约花不到 1 分钱</small></div>
+        <select class="model-sel" id="model-sel"><option value="claude-haiku-5-5">Haiku 5.5（快、省）</option><option value="claude-sonnet-5-5">Sonnet 5.5（更聪明）</option></select></div>
+    </div>
+    <p class="fine">在 console.anthropic.com 创建 API key，按用量付费。key 只存在这台手机上。</p>
+
+    <div class="group">
+      <div class="row"><span class="ic" style="--c:#C99A1E" data-icon="wallet"></span><div class="grow"><label for="budget-in">每月预算</label><small>Claude 判断值不值时会参考</small></div><input class="budget-in" id="budget-in" type="number" inputmode="decimal" min="0" placeholder="未设置"></div>
+      <div class="row"><span class="ic" style="--c:#2BAE66" data-icon="bell"></span><div class="grow">付款后自动提醒<small id="ls-status">未开启</small></div><button class="btn sm" type="button" id="ls-btn">去开启</button></div>
+    </div>
+    <p class="fine">开启后，微信支付和支付宝的付款通知一到，值不值就会提醒你记一笔。只看这两个 app 的付款通知，内容只存在手机上。在系统设置里找到「值不值 · 付款识别」打开即可。</p>
+
+    <div class="group">
+      <details id="d-import">
+        <summary><span class="ic" style="--c:#3F7CF0" data-icon="list"></span><span class="grow">导入微信 / 支付宝账单</span></summary>
+        <div class="d-body">
+          <p class="muted">一次性把以前的收支导进来，退款和重复的会自动跳过。也可以在这里选备份文件来恢复。</p>
+          <ol>
+            <li><b>微信</b>：「账单」页 → 下载账单 → 用于个人对账，账单发到邮箱。</li>
+            <li><b>支付宝</b>：「账单」页右上角 → 开具交易流水证明 → 用于个人对账。</li>
+            <li>邮件里的压缩包，解压密码在微信 / 支付宝消息里。解压后选里面的 .csv 或 .xlsx。</li>
+          </ol>
+          <span class="btn primary filebtn">选择文件<input type="file" id="bill-file"></span>
+          <p class="muted" id="import-status"></p>
+        </div>
+      </details>
+      <div class="row"><span class="ic" style="--c:#7A8BA3" data-icon="save"></span><div class="grow">导出备份<small>换手机或重装前先导出，之后在上面「导入」里选它恢复</small></div><button class="btn sm" type="button" id="export-btn">导出</button></div>
+    </div>
+    <p class="fine" style="text-align:center">账本只存在这台手机上</p>
+  </section>
+
+  <nav class="tabbar" aria-label="主导航">
+    <button class="tab" data-tab="home" type="button"><span data-icon="list"></span>明细</button>
+    <button class="tab" data-tab="stats" type="button"><span data-icon="pie"></span>统计</button>
+    <button class="fab" id="fab" type="button" aria-label="记一笔"><svg width="26" height="26" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" aria-hidden="true"><path d="M12 5v14M5 12h14"/></svg></button>
+    <button class="tab" data-tab="claude" type="button"><span data-icon="chat"></span>Claude</button>
+    <button class="tab" data-tab="me" type="button"><span data-icon="user"></span>我的</button>
+  </nav>
+  <div class="toast" id="toast" role="status" hidden></div>
+</div>
+<div class="scrim" id="scrim" hidden></div>
+<div class="sheet" id="sheet" role="dialog" aria-modal="true" aria-label="记一笔" hidden></div>
+
+<script>
+(function(){
+const NATIVE = typeof window.Android !== 'undefined';
+const DEFAULT_MODEL = 'claude-haiku-5-5';
+
+/* ---------- 图标 ---------- */
+const P = {
+  bowl:'<path d="M4 11h16a8 8 0 0 1-16 0Z"/><path d="M9 4.5c-.6.8-.6 1.7 0 2.5M12 4c-.6.8-.6 1.7 0 2.5M15 4.5c-.6.8-.6 1.7 0 2.5"/>',
+  cup:'<path d="M6.5 9h11l-1.3 10.2a1 1 0 0 1-1 .8H8.8a1 1 0 0 1-1-.8Z"/><path d="M5 9h14"/><path d="M12.5 9 14 3.5h3"/>',
+  bag:'<path d="M5 8h14l-1 12H6Z"/><path d="M9 10V7a3 3 0 0 1 6 0v3"/>',
+  phone:'<rect x="7" y="3" width="10" height="18" rx="2.2"/><path d="M11 17.5h2"/>',
+  game:'<rect x="2.5" y="7.5" width="19" height="10" rx="5"/><path d="M7.5 10.5v4M5.5 12.5h4"/><path d="M15 11.5h.01M17.5 13.5h.01" stroke-width="2.6"/>',
+  book:'<path d="M6 3h12v18H6a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2Z"/><path d="M9 7.5h6"/>',
+  home:'<path d="M4 11.5 12 4.5l8 7"/><path d="M6.5 10v9.5h11V10"/><path d="M10 19.5v-5h4v5"/>',
+  bus:'<rect x="5" y="3.5" width="14" height="14" rx="3"/><path d="M5 11h14M8 17.5V20M16 17.5V20"/><path d="M8.5 14.3h.01M15.5 14.3h.01" stroke-width="2.6"/>',
+  play:'<circle cx="12" cy="12" r="9"/><path d="M10 8.8v6.4l5.2-3.2Z"/>',
+  wifi:'<path d="M3 9.5a13 13 0 0 1 18 0M6 13a8.5 8.5 0 0 1 12 0M9 16.5a4 4 0 0 1 6 0"/><path d="M12 19.5h.01" stroke-width="2.8"/>',
+  gift:'<rect x="4" y="10" width="16" height="10" rx="1.5"/><path d="M3 7h18v3H3ZM12 7v13"/><path d="M12 7C11 4 7.5 4 8 6.2 8.3 7 12 7 12 7Zm0 0c1-3 4.5-3 4-.8C15.7 7 12 7 12 7Z"/>',
+  dots:'<path d="M6 12h.01M12 12h.01M18 12h.01" stroke-width="3"/>',
+  wallet:'<path d="M4 7.5h14.5a1.5 1.5 0 0 1 1.5 1.5v9.5a1.5 1.5 0 0 1-1.5 1.5H5.5A1.5 1.5 0 0 1 4 18.5Z"/><path d="M4 7.5 15.5 4v3.5"/><path d="M16 14h.01" stroke-width="2.8"/>',
+  case:'<rect x="3" y="7" width="18" height="13" rx="2"/><path d="M9 7V4.5h6V7M3 12.5h18"/>',
+  star:'<path d="M12 3.5l2.6 5.3 5.8.8-4.2 4.1 1 5.8L12 16.8l-5.2 2.7 1-5.8-4.2-4.1 5.8-.8Z"/>',
+  env:'<rect x="5" y="3" width="14" height="18" rx="2"/><path d="M5 8.5c4 2.8 10 2.8 14 0"/><circle cx="12" cy="11" r="1.8"/>',
+  plus:'<circle cx="12" cy="12" r="9"/><path d="M12 8v8M8 12h8"/>',
+  list:'<path d="M9 6.5h11M9 12h11M9 17.5h11"/><path d="M4.5 6.5h.01M4.5 12h.01M4.5 17.5h.01" stroke-width="2.8"/>',
+  pie:'<path d="M11 4a8 8 0 1 0 9 9h-9Z"/><path d="M14 3.2A8 8 0 0 1 20.8 10H14Z"/>',
+  chat:'<path d="M4.5 5.5h15a1 1 0 0 1 1 1v9a1 1 0 0 1-1 1H10l-4.5 3.5v-3.5h-1a1 1 0 0 1-1-1v-9a1 1 0 0 1 1-1Z"/><path d="M8.5 11h.01M12 11h.01M15.5 11h.01" stroke-width="2.6"/>',
+  user:'<circle cx="12" cy="8" r="4"/><path d="M4.5 20.5a7.5 7.5 0 0 1 15 0"/>',
+  bell:'<path d="M6 16V11a6 6 0 0 1 12 0v5l1.5 2h-15Z"/><path d="M10 20.5a2 2 0 0 0 4 0"/>',
+  save:'<path d="M12 4v11M7.5 10.5 12 15l4.5-4.5"/><path d="M5 19.5h14"/>',
+  chevL:'<path d="M15 5l-7 7 7 7"/>', chevR:'<path d="M9 5l7 7-7 7"/>',
+  send:'<path d="M5 12h13M13 6l6 6-6 6"/>',
+  del:'<path d="M20 6H9l-5 6 5 6h11Z"/><path d="M12 10l4 4M16 10l-4 4"/>'
+};
+const svg = (n, s = 22) => `<svg width="${s}" height="${s}" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">${P[n] || P.dots}</svg>`;
+document.querySelectorAll('[data-icon]').forEach(el => { el.innerHTML = svg(el.dataset.icon, el.classList.contains('ic') ? 20 : 24); });
+document.getElementById('chat-ic').innerHTML = svg('chat', 20);
+document.getElementById('c-send').innerHTML = svg('send', 20);
+
+/* ---------- 分类 ---------- */
+const OUT = [
+  {k:'餐饮',c:'#F08A3E',i:'bowl'},{k:'零食饮料',c:'#E6618C',i:'cup'},{k:'购物',c:'#A066D9',i:'bag'},{k:'数码',c:'#3F7CF0',i:'phone'},{k:'游戏',c:'#20A8B8',i:'game'},
+  {k:'学习',c:'#2E9E5B',i:'book'},{k:'日用',c:'#C99A1E',i:'home'},{k:'交通',c:'#5466D4',i:'bus'},{k:'娱乐',c:'#D9534F',i:'play'},{k:'话费网费',c:'#7A8BA3',i:'wifi'},
+  {k:'人情社交',c:'#B8763E',i:'gift'},{k:'其他',c:'#98A2B3',i:'dots'}
+];
+const IN = [{k:'生活费',c:'#118C7A',i:'wallet'},{k:'兼职',c:'#3F7CF0',i:'case'},{k:'奖学金',c:'#C99A1E',i:'star'},{k:'红包',c:'#D9534F',i:'env'},{k:'其他收入',c:'#98A2B3',i:'plus'}];
+function cat(name, type){
+  const list = type === 'in' ? IN : OUT;
+  return list.find(c => c.k === name) || list[list.length - 1];
+}
+
+/* ---------- 小工具 ---------- */
+const $ = s => document.querySelector(s);
+const esc = s => String(s ?? '').replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
+const r2 = n => Math.round(n * 100) / 100;
+const money = n => r2(n).toLocaleString('zh-CN', {minimumFractionDigits:2, maximumFractionDigits:2});
+const fmt = n => '¥' + money(n);
+const fmt0 = n => '¥' + Math.round(n).toLocaleString('zh-CN');
+const pad2 = n => String(n).padStart(2, '0');
+const monthKey = d => d.getFullYear() + '-' + pad2(d.getMonth() + 1);
+const ymd = d => monthKey(d) + '-' + pad2(d.getDate());
+const shiftMonth = (k, n) => { const [y, m] = k.split('-').map(Number); return monthKey(new Date(y, m - 1 + n, 1)); };
+const WEEK = '日一二三四五六';
+const uid8 = () => Date.now().toString(36) + Math.random().toString(36).slice(2, 8);
+const typeOf = i => i.type === 'in' ? 'in' : 'out';
+const byTsDesc = (a, b) => (b.ts > a.ts ? 1 : b.ts < a.ts ? -1 : 0);
+function daysLeft(){ const n = new Date(); return new Date(n.getFullYear(), n.getMonth() + 1, 0).getDate() - n.getDate() + 1; }
+function hm(d){ return pad2(d.getHours()) + ':' + pad2(d.getMinutes()); }
+
+const state = { months:{}, settings:{budget:0, model:DEFAULT_MODEL}, tab:'home', month: monthKey(new Date()), statType:'out', showAll:false, chat:[], review:null, pending:[], ai:false };
+
+let toastT;
+function toast(msg){ const t = $('#toast'); t.textContent = msg; t.hidden = false; clearTimeout(toastT); toastT = setTimeout(() => { t.hidden = true; }, 2400); }
+window.__toast = toast;
+
+/* ---------- 存储：手机里的 data.json（浏览器里调试时用 localStorage） ---------- */
+const LS_KEY = 'zhibuzhi-v1';
+function loadData(){
+  try {
+    const raw = NATIVE ? window.Android.load() : localStorage.getItem(LS_KEY);
+    if (raw){ const v = JSON.parse(raw); state.months = v.months || {}; state.settings = Object.assign({budget:0, model:DEFAULT_MODEL}, v.settings || {}); }
+  } catch(e){ toast('账本读取失败'); }
+}
+let saveT = null;
+function flush(){
+  clearTimeout(saveT); saveT = null;
+  const s = JSON.stringify({v:1, months: state.months, settings: state.settings});
+  try { const ok = NATIVE ? window.Android.save(s) : (localStorage.setItem(LS_KEY, s), true); if (!ok) toast('保存失败，手机空间可能不够了'); }
+  catch(e){ toast('保存失败'); }
+}
+function persist(){ clearTimeout(saveT); saveT = setTimeout(flush, 120); }
+window.__flush = () => { if (saveT) flush(); };
+document.addEventListener('visibilitychange', () => { if (document.hidden && saveT) flush(); });
+
+function addItems(list){ for (const it of list){ const k = monthKey(new Date(it.ts)); state.months[k] = (state.months[k] || []).concat([it]); } persist(); renderData(); }
+function findItem(id){ for (const k in state.months){ const it = state.months[k].find(i => i.id === id); if (it) return {k, it}; } return null; }
+function removeItem(id){ const f = findItem(id); if (!f) return; state.months[f.k] = state.months[f.k].filter(i => i.id !== id); if (!state.months[f.k].length) delete state.months[f.k]; persist(); renderData(); }
+function replaceItem(id, next){ const f = findItem(id); if (f){ state.months[f.k] = state.months[f.k].filter(i => i.id !== id); if (!state.months[f.k].length) delete state.months[f.k]; } addItems([next]); }
+
+/* ---------- 统计 ---------- */
+function monthData(k){
+  const items = state.months[k] || [];
+  let out = 0, inc = 0, saved = 0, savedN = 0, n = 0; const byCat = {out:{}, in:{}}; const byDay = {};
+  for (const i of items){
+    const a = Number(i.amount) || 0;
+    if (i.status === 'skipped'){ saved += a; savedN++; continue; }
+    const t = typeOf(i); const c = cat(i.category, t).k; n++;
+    byCat[t][c] = (byCat[t][c] || 0) + a;
+    if (t === 'in') inc += a; else { out += a; const d = new Date(i.ts).getDate(); byDay[d] = (byDay[d] || 0) + a; }
+  }
+  return {items, out, inc, saved, savedN, n, byCat, byDay};
+}
+
+/* ---------- 原生状态 ---------- */
+function refreshNative(){
+  state.ai = NATIVE && !!window.Android.hasKey();
+  state.pending = [];
+  if (NATIVE){ try { const a = JSON.parse(window.Android.getPending() || '[]'); if (Array.isArray(a)) state.pending = a.sort((x, y) => y.ts - x.ts); } catch(e){} }
+  const ks = $('#key-status'); if (ks) ks.textContent = state.ai ? '已保存：' + window.Android.keyHint() : (NATIVE ? '还没填，填了才能用 Claude' : '在安卓 app 里才能用');
+  if (NATIVE){
+    const on = !!window.Android.listenerOn();
+    $('#ls-status').textContent = on ? '已开启' : '未开启';
+    $('#ls-status').classList.toggle('on', on);
+    $('#ls-btn').textContent = on ? '设置' : '去开启';
+    if (on) window.Android.askNotify();
+  }
+}
+
+/* ---------- 页面切换 ---------- */
+function setTab(t){
+  state.tab = t;
+  for (const v of ['home','stats','claude','me']) $('#v-' + v).hidden = v !== t;
+  document.querySelectorAll('.tab').forEach(b => { if (b.dataset.tab === t) b.setAttribute('aria-current', 'page'); else b.removeAttribute('aria-current'); });
+  if (t === 'claude') renderChat();
+}
+document.querySelectorAll('.tab').forEach(b => b.addEventListener('click', () => setTab(b.dataset.tab)));
+
+function monthBar(title){
+  const [y, m] = state.month.split('-');
+  const isCur = state.month === monthKey(new Date());
+  return `<div class="mbar"><h1>${y}年${Number(m)}月${title ? ' · ' + title : ''}</h1><div class="mnav">
+    <button class="iconbtn" type="button" data-mnav="-1" aria-label="上个月">${svg('chevL', 18)}</button>
+    <button class="iconbtn" type="button" data-mnav="1" aria-label="下个月"${isCur ? ' disabled' : ''}>${svg('chevR', 18)}</button></div></div>`;
+}
+document.addEventListener('click', e => {
+  const b = e.target.closest('[data-mnav]'); if (!b) return;
+  state.month = shiftMonth(state.month, Number(b.dataset.mnav)); state.showAll = false; state.review = null;
+  renderHome(); renderStats();
+});
+function bigAmount(n){ const s = money(n); const i = s.lastIndexOf('.'); return `¥${s.slice(0, i)}<small>${s.slice(i)}</small>`; }
+function whenLabel(ts){
+  const d = new Date(ts); const mins = Math.round((Date.now() - ts) / 60000);
+  if (mins < 1) return '刚刚'; if (mins < 60) return mins + ' 分钟前';
+  return (ymd(d) === ymd(new Date()) ? '今天 ' : `${d.getMonth() + 1}月${d.getDate()}日 `) + hm(d);
+}
+
+/* ---------- 明细 ---------- */
+function renderHome(){
+  const v = $('#v-home');
+  const d = monthData(state.month);
+  const isCur = state.month === monthKey(new Date());
+  const b = state.settings.budget || 0;
+  let html = monthBar('');
+  html += `<div class="hero"><div><div class="h-lab">${isCur ? '本月' : '当月'}支出</div><div class="h-amt">${bigAmount(d.out)}</div></div>
+    <div class="h-row"><div><span>收入</span><b>${fmt(d.inc)}</b></div><div><span>结余</span><b>${d.inc - d.out < 0 ? '-' : ''}${fmt(Math.abs(d.inc - d.out))}</b></div></div>`;
+  if (isCur && b > 0){
+    const left = b - d.out; const dl = daysLeft();
+    html += `<div class="h-bud"><div class="h-track"><i style="width:${Math.min(100, d.out / b * 100).toFixed(1)}%"></i></div>
+      <div class="h-btxt">${left >= 0 ? `预算 ${fmt0(b)} · 还剩 <b>${fmt(left)}</b> · 每天约 <b>${fmt0(left / dl)}</b>` : `预算 ${fmt0(b)} · 已超出 <b>${fmt(-left)}</b>`}</div></div>`;
+  } else if (isCur){
+    html += `<button class="h-set" type="button" data-go="budget">设置每月预算 ›</button>`;
+  }
+  html += `</div>`;
+
+  if (state.pending.length){
+    html += `<div class="card pend"><div class="card-h"><h2>刚检测到的付款</h2><span class="muted" style="font-size:.82rem">${state.pending.length} 笔待记</span></div>`;
+    for (const p of state.pending.slice(0, 5)){
+      html += `<div class="prow"><span class="ic" style="--c:${p.platform === '微信' ? '#2BAE66' : '#1677FF'}">${svg('wallet')}</span>
+        <span class="r-main"><span class="r-name">${esc(p.merchant || p.platform + '付款')}</span><span class="r-meta">${esc(p.platform)} · ${whenLabel(p.ts)}</span></span>
+        <span class="r-amt">-${money(+p.amount || 0)}</span>
+        <div class="p-act"><button class="btn sm" type="button" data-ignore="${esc(p.id)}">忽略</button><button class="btn sm primary" type="button" data-pend="${esc(p.id)}">记一笔</button></div></div>`;
+    }
+    html += `</div>`;
+  }
+
+  html += `<div class="pill-row">`;
+  if (state.ai) html += `<button class="pill ai" type="button" data-ask="${isCur ? '这个月花得怎么样？哪里该省？' : '帮我看看' + Number(state.month.split('-')[1]) + '月花得怎么样'}">${svg('chat', 16)}问 Claude：${isCur ? '这个月花得怎么样？' : '那个月花得怎么样？'}</button>`;
+  if (d.savedN) html += `<span class="pill saved">劝住 ${d.savedN} 次 · 省下 ${fmt(d.saved)}</span>`;
+  html += `</div>`;
+
+  const items = d.items.slice().sort(byTsDesc);
+  if (!items.length){
+    html += isCur
+      ? `<div class="empty"><b>还没有记账</b><span>点下面的 ＋ 记第一笔，<br>或者去 Claude 那里说"午饭 18"。</span></div>`
+      : `<div class="empty"><b>这个月没有记录</b></div>`;
+    v.innerHTML = html; return;
+  }
+  const LIMIT = 80;
+  const shown = state.showAll ? items : items.slice(0, LIMIT);
+  const groups = new Map();
+  for (const i of shown){ const dt = new Date(i.ts); const k = ymd(dt); if (!groups.has(k)) groups.set(k, {dt, list:[]}); groups.get(k).list.push(i); }
+  const today = ymd(new Date()), yest = ymd(new Date(Date.now() - 864e5));
+  for (const [k, g] of groups){
+    let o = 0, n = 0; for (const i of g.list){ if (i.status === 'skipped') continue; if (typeOf(i) === 'in') n += +i.amount || 0; else o += +i.amount || 0; }
+    const label = (k === today ? '今天 · ' : k === yest ? '昨天 · ' : '') + `${g.dt.getMonth() + 1}月${g.dt.getDate()}日 周${WEEK[g.dt.getDay()]}`;
+    html += `<div class="day"><div class="day-h"><span>${label}</span><span class="num">${o ? '支 ' + money(o) : ''}${o && n ? '　' : ''}${n ? '收 ' + money(n) : ''}</span></div>`;
+    for (const i of g.list){
+      const t = typeOf(i); const c = cat(i.category, t); const sk = i.status === 'skipped';
+      const vt = i.verdict ? `<span class="tag ${i.verdict === '值' ? 'g' : i.verdict === '不值' ? 'b' : 'w'}">${esc(i.verdict)}</span>` : '';
+      html += `<button class="rec${sk ? ' skip' : ''}" type="button" data-id="${esc(i.id)}"><span class="ic" style="--c:${c.c}">${svg(c.i)}</span>
+        <span class="r-main"><span class="r-name">${esc(i.name || c.k)}</span><span class="r-meta"><span>${c.k}</span><span>${hm(new Date(i.ts))}</span>${i.platform ? `<span>${esc(i.platform)}</span>` : ''}${sk ? '<span class="tag g">没买</span>' : ''}${vt}</span></span>
+        <span class="r-amt${t === 'in' ? ' in' : ''}">${t === 'in' ? '+' : '-'}${money(+i.amount || 0)}</span></button>`;
+    }
+    html += `</div>`;
+  }
+  if (!state.showAll && items.length > LIMIT) html += `<button class="more" type="button" data-more>显示全部 ${items.length} 笔</button>`;
+  v.innerHTML = html;
+}
+$('#v-home').addEventListener('click', e => {
+  const r = e.target.closest('[data-id]'); if (r){ openSheet(r.dataset.id); return; }
+  const pd = e.target.closest('[data-pend]'); if (pd){ openPending(pd.dataset.pend); return; }
+  const ig = e.target.closest('[data-ignore]'); if (ig){ if (NATIVE) window.Android.removePending(ig.dataset.ignore); refreshNative(); renderHome(); return; }
+  if (e.target.closest('[data-more]')){ state.showAll = true; renderHome(); return; }
+  if (e.target.closest('[data-go="budget"]')){ setTab('me'); $('#budget-in').focus(); return; }
+  const a = e.target.closest('[data-ask]'); if (a){ setTab('claude'); sendChat(a.dataset.ask); }
+});
+
+/* ---------- 统计 ---------- */
+function donut(entries, total, type){
+  const R = 72, C = 2 * Math.PI * R; let off = 0; let segs = '';
+  const gap = entries.length > 1 ? 2 : 0;
+  for (const [k, a] of entries){
+    const len = total ? a / total * C : 0; const c = cat(k, type).c;
+    segs += `<circle cx="100" cy="100" r="${R}" fill="none" stroke="${c}" stroke-width="24" stroke-dasharray="${Math.max(0, len - gap).toFixed(2)} ${C.toFixed(2)}" stroke-dashoffset="${(-off).toFixed(2)}" transform="rotate(-90 100 100)"/>`;
+    off += len;
+  }
+  if (!entries.length) segs = `<circle cx="100" cy="100" r="${R}" fill="none" stroke="var(--sunk)" stroke-width="24"/>`;
+  return `<svg viewBox="0 0 200 200" role="img" aria-label="${type === 'in' ? '收入' : '支出'}分类占比">${segs}
+    <text x="100" y="94" text-anchor="middle" class="sub" font-size="12">${type === 'in' ? '总收入' : '总支出'}</text>
+    <text x="100" y="118" text-anchor="middle" font-size="20" font-weight="800">${fmt0(total)}</text></svg>`;
+}
+function dayBars(d){
+  const [y, m] = state.month.split('-').map(Number);
+  const nd = new Date(y, m, 0).getDate();
+  const W = 320, H = 130, top = 16, bot = 20, left = 4, right = 4;
+  const vals = []; let max = 0; for (let i = 1; i <= nd; i++){ const v = d.byDay[i] || 0; vals.push(v); if (v > max) max = v; }
+  const bw = (W - left - right) / nd; const sc = max ? (H - top - bot) / max : 0;
+  const isCur = state.month === monthKey(new Date()); const td = new Date().getDate();
+  let s = `<line class="grid" x1="0" x2="${W}" y1="${H - bot}" y2="${H - bot}"/>`;
+  vals.forEach((v, i) => { const h = v * sc; if (h > 0) s += `<rect class="b${isCur && i + 1 === td ? ' today' : ''}" x="${(left + i * bw + bw * .18).toFixed(1)}" y="${(H - bot - h).toFixed(1)}" width="${(bw * .64).toFixed(1)}" height="${Math.max(1.5, h).toFixed(1)}" rx="1.5"/>`; });
+  for (const dd of [1, 10, 20, nd]) s += `<text class="ax" x="${(left + (dd - .5) * bw).toFixed(1)}" y="${H - 6}" text-anchor="middle">${dd}日</text>`;
+  if (max){ const mi = vals.indexOf(max); s += `<text class="ax" x="${Math.min(W - 30, Math.max(30, left + (mi + .5) * bw)).toFixed(1)}" y="${(H - bot - max * sc - 5).toFixed(1)}" text-anchor="middle">${fmt0(max)}</text>`; }
+  return `<svg viewBox="0 0 ${W} ${H}" role="img" aria-label="每日支出">${s}</svg>`;
+}
+function renderStats(){
+  const v = $('#v-stats'); const d = monthData(state.month); const t = state.statType;
+  const entries = Object.entries(d.byCat[t]).sort((a, b) => b[1] - a[1]);
+  const total = t === 'in' ? d.inc : d.out;
+  let html = monthBar('统计');
+  html += `<div class="card"><div class="card-h"><h2>分类</h2><div class="seg" role="group" aria-label="支出或收入">
+    <button type="button" data-st="out" aria-pressed="${t === 'out'}">支出</button><button type="button" data-st="in" aria-pressed="${t === 'in'}">收入</button></div></div>
+    <div class="donut">${donut(entries, total, t)}</div><div class="legend">`;
+  if (!entries.length) html += `<p class="muted" style="margin:0;text-align:center">这个月还没有${t === 'in' ? '收入' : '支出'}记录</p>`;
+  for (const [k, a] of entries){ const c = cat(k, t); const pct = total ? a / total * 100 : 0;
+    html += `<div class="lg"><span class="ic" style="--c:${c.c}">${svg(c.i, 18)}</span><div class="lg-mid"><div class="lg-top"><span>${k}</span><span>${pct.toFixed(pct < 10 ? 1 : 0)}%</span></div><div class="lg-bar" style="--c:${c.c}"><i style="width:${(entries[0][1] ? a / entries[0][1] * 100 : 0).toFixed(1)}%"></i></div></div><span class="lg-amt">${fmt(a)}</span></div>`; }
+  html += `</div></div>`;
+  if (t === 'out'){
+    const [yy, mm] = state.month.split('-').map(Number);
+    const days = state.month === monthKey(new Date()) ? new Date().getDate() : new Date(yy, mm, 0).getDate();
+    html += `<div class="card"><div class="card-h"><h2>每日支出</h2><span class="muted num" style="font-size:.8rem">日均 ${fmt0(d.out / days)}</span></div><div class="bars">${dayBars(d)}</div></div>`;
+  }
+  const rv = state.review;
+  html += `<div class="card"><div class="card-h"><h2>Claude 点评</h2>${state.ai ? `<button class="btn ai sm" type="button" id="rev-btn"${rv && rv.busy ? ' disabled' : ''}>${rv && rv.busy ? '正在看…' : '点评这个月'}</button>` : ''}</div>
+    ${rv ? `<div class="review">${esc(rv.text || '正在看你这个月的账…')}</div>` : `<p class="muted" style="margin:0;font-size:.88rem">${state.ai ? '让 Claude 看看这个月钱都花哪了，给下个月定个目标。' : '在「我的」里填上 API key 就能用。'}</p>`}</div>`;
+  v.innerHTML = html;
+}
+$('#v-stats').addEventListener('click', e => {
+  const s = e.target.closest('[data-st]'); if (s){ state.statType = s.dataset.st; renderStats(); return; }
+  if (e.target.closest('#rev-btn')) review();
+});
+
+function renderData(){
+  renderHome(); renderStats();
+  if (state.tab === 'claude') renderChat();
+  if (document.activeElement !== $('#budget-in')) $('#budget-in').value = state.settings.budget || '';
+  $('#model-sel').value = state.settings.model || DEFAULT_MODEL;
+}
+
+/* ---------- 记账弹层 ---------- */
+let sh = null, lastFocus = null;
+function openSheet(id, preset){
+  if (id){
+    const f = findItem(id); if (!f) return;
+    const it = f.it; const t = typeOf(it);
+    sh = {mode:'edit', id, type:t, amt: String(r2(+it.amount || 0)), cat: cat(it.category, t).k, note: it.name || '', date: ymd(new Date(it.ts)), origTs: it.ts, item: it, v:null, armed:false};
+  } else {
+    sh = Object.assign({mode:'new', type:'out', amt:'', cat:'餐饮', note:'', date: ymd(new Date()), v:null, armed:false}, preset || {});
+  }
+  lastFocus = document.activeElement;
+  $('#scrim').hidden = false; $('#sheet').hidden = false;
+  renderSheet();
+}
+function openPending(pid){
+  const p = state.pending.find(x => x.id === pid); if (!p) return;
+  setTab('home');
+  const d = new Date(p.ts);
+  openSheet(null, {amt: String(r2(+p.amount || 0)), note: p.merchant || '', date: ymd(d), at: d.toISOString(), platform: p.platform, pendId: p.id});
+}
+window.__onPayment = id => { refreshNative(); renderHome(); openPending(id); };
+function closeSheet(){
+  if (askCtl) cancelClaude(askCtl);
+  sh = null; $('#scrim').hidden = true; $('#sheet').hidden = true; $('#sheet').innerHTML = '';
+  if (lastFocus && lastFocus.focus) lastFocus.focus();
+}
+function amtView(){
+  if (!sh.amt) return `<span class="val ph">0.00</span>`;
+  const [a, b] = sh.amt.split('.');
+  return `<span class="val">${Number(a || 0).toLocaleString('zh-CN')}${b !== undefined ? '.' + b : ''}</span>`;
+}
+function renderSheet(){
+  const s = $('#sheet'); if (!sh) return;
+  if (sh.v){ s.innerHTML = `<div class="grab"></div>` + verdictHTML(); return; }
+  const cats = sh.type === 'in' ? IN : OUT;
+  const canAsk = sh.mode === 'new' && sh.type === 'out' && state.ai && !sh.pendId;
+  s.innerHTML = `<div class="grab"></div>
+    <div class="sh-head"><div class="seg" role="group" aria-label="类型"><button type="button" data-type="out" aria-pressed="${sh.type === 'out'}">支出</button><button type="button" data-type="in" aria-pressed="${sh.type === 'in'}">收入</button></div>
+      ${sh.pendId ? `<span class="sh-src">${esc(sh.platform)}付款 · ${hm(new Date(sh.at))}</span>` : ''}<button class="txtbtn" type="button" data-close>取消</button></div>
+    <div class="sh-amt" id="sh-amt" aria-live="polite"><span class="cur">¥</span>${amtView()}</div>
+    <div class="cgrid" role="group" aria-label="分类">${cats.map(c => `<button class="cbtn" type="button" data-cat="${c.k}" aria-pressed="${c.k === sh.cat}"><span class="ic" style="--c:${c.c}">${svg(c.i)}</span>${c.k}</button>`).join('')}</div>
+    <div class="sh-row"><input type="text" id="sh-note" maxlength="40" placeholder="${sh.type === 'in' ? '备注' : '备注：买了什么'}" value="${esc(sh.note)}" aria-label="备注"><input type="date" class="date-in" id="sh-date" value="${sh.date}" max="${ymd(new Date())}" aria-label="日期"></div>
+    <div class="pad">${['1','2','3','4','5','6','7','8','9','.','0','del'].map(k => `<button class="key" type="button" data-key="${k}" aria-label="${k === 'del' ? '删除一位' : k === '.' ? '小数点' : k}">${k === 'del' ? svg('del', 24) : k}</button>`).join('')}</div>
+    <p class="hint" id="sh-hint" hidden></p>
+    <div class="sh-act">${sh.mode === 'edit'
+      ? `<button class="btn danger" type="button" data-delete>${sh.armed ? '确认删除' : '删除'}</button><button class="btn primary" type="button" data-save>保存</button>`
+      : (canAsk
+        ? `<button class="btn ai" type="button" data-askv>${svg('chat', 18)}值不值？</button><button class="btn primary" type="button" data-save>记一笔</button>`
+        : `<button class="btn" type="button" data-close>取消</button><button class="btn primary" type="button" data-save>记一笔</button>`)}</div>`;
+}
+function hint(msg){ const h = $('#sh-hint'); if (!h) return; h.textContent = msg; h.hidden = !msg; }
+function keyIn(k){
+  let s = sh.amt;
+  if (k === 'del') s = s.slice(0, -1);
+  else if (k === '.'){ if (s.includes('.')) return; s = (s || '0') + '.'; }
+  else { const [ip, dp] = s.split('.'); if (dp !== undefined){ if (dp.length >= 2) return; } else if (ip.length >= 7) return; if (s === '0') s = ''; s += k; }
+  sh.amt = s;
+  const el = $('#sh-amt'); if (el) el.innerHTML = `<span class="cur">¥</span>${amtView()}`;
+  hint('');
+}
+function readSheet(){
+  const n = $('#sh-note'); if (n) sh.note = n.value.trim();
+  const d = $('#sh-date'); if (d && d.value) sh.date = d.value;
+}
+function sheetTs(){
+  if (sh.mode === 'edit' && sh.date === ymd(new Date(sh.origTs))) return sh.origTs;
+  if (sh.at && sh.date === ymd(new Date(sh.at))) return sh.at;
+  if (sh.date === ymd(new Date())) return new Date().toISOString();
+  const [y, m, d] = sh.date.split('-').map(Number); return new Date(y, m - 1, d, 12, 0).toISOString();
+}
+function needAmount(){
+  const a = parseFloat(sh.amt);
+  if (!(a > 0)){ hint('先输入金额'); const el = $('#sh-amt'); if (el){ el.classList.remove('shake'); void el.offsetWidth; el.classList.add('shake'); } return 0; }
+  return r2(a);
+}
+function saveSheet(status){
+  readSheet(); const a = needAmount(); if (!a) return;
+  const base = {type: sh.type, amount: a, category: sh.cat, name: sh.note, ts: sheetTs()};
+  if (sh.mode === 'edit'){
+    replaceItem(sh.id, Object.assign({}, sh.item, base)); toast('已保存');
+  } else {
+    const it = Object.assign({id:'m-' + uid8()}, base, {source: sh.pendId ? 'notify' : 'manual'});
+    if (sh.platform) it.platform = sh.platform;
+    if (status === 'skipped') it.status = 'skipped';
+    if (sh.verdictResult){ it.verdict = sh.verdictResult.verdict; it.score = sh.verdictResult.score; }
+    if (sh.pendId && NATIVE){ window.Android.removePending(sh.pendId); refreshNative(); }
+    state.month = monthKey(new Date(it.ts));
+    addItems([it]);
+    toast(status === 'skipped' ? `没买，省下 ${fmt(a)}` : `${sh.type === 'in' ? '收入' : '记下'} ${fmt(a)}`);
+  }
+  closeSheet();
+}
+$('#sheet').addEventListener('click', e => {
+  if (!sh) return;
+  const t = e.target;
+  if (t.closest('[data-close]')){ closeSheet(); return; }
+  const ty = t.closest('[data-type]'); if (ty){ readSheet(); sh.type = ty.dataset.type; sh.cat = (sh.type === 'in' ? IN : OUT)[0].k; renderSheet(); return; }
+  const c = t.closest('[data-cat]'); if (c){ readSheet(); sh.cat = c.dataset.cat; document.querySelectorAll('#sheet .cbtn').forEach(b => b.setAttribute('aria-pressed', b === c)); return; }
+  const k = t.closest('[data-key]'); if (k){ keyIn(k.dataset.key); return; }
+  if (t.closest('[data-save]')){ saveSheet(); return; }
+  if (t.closest('[data-delete]')){
+    if (!sh.armed){ readSheet(); sh.armed = true; renderSheet(); return; }
+    removeItem(sh.id); toast('删掉了'); closeSheet(); return;
+  }
+  if (t.closest('[data-askv]')){ askVerdict(); return; }
+  const va = t.closest('[data-v]'); if (va){
+    const a = va.dataset.v;
+    if (a === 'stop'){ if (askCtl) cancelClaude(askCtl); sh.v = null; renderSheet(); return; }
+    if (a === 'back'){ sh.v = null; renderSheet(); return; }
+    if (a === 'retry'){ askVerdict(); return; }
+    if (a === 'buy') saveSheet(); else if (a === 'skip') saveSheet('skipped');
+  }
+});
+$('#scrim').addEventListener('click', closeSheet);
+$('#fab').addEventListener('click', () => openSheet());
+window.__onBack = () => {
+  if (sh){ closeSheet(); return true; }
+  if (state.tab !== 'home'){ setTab('home'); return true; }
+  return false;
+};
+
+/* ---------- 调用 Claude（通过手机端的 Android.ask） ---------- */
+const calls = {};
+window.__onClaude = function(id, ok, payload){
+  const c = calls[id]; if (!c) return; delete calls[id];
+  if (ok){
+    try {
+      const j = JSON.parse(payload);
+      const text = (j.content || []).filter(b => b.type === 'text').map(b => b.text).join('').trim();
+      if (text) c.resolve(text); else c.reject({status:-1, message:'empty'});
+    } catch(e){ c.reject({status:-1, message:'parse'}); }
+    return;
+  }
+  const err = {status:0, message:''};
+  try {
+    const o = JSON.parse(payload); err.status = o.status || 0; err.message = o.message || '';
+    if (o.body){ try { const b = JSON.parse(o.body); err.message = (b.error && b.error.message) || String(o.body); } catch(_){ err.message = String(o.body).slice(0, 200); } }
+  } catch(_){}
+  c.reject(err);
+};
+function callClaude(opts, ctl){
+  return new Promise((resolve, reject) => {
+    if (!NATIVE || !window.Android.hasKey()){ reject({code:'nokey'}); return; }
+    const id = 'q' + uid8(); calls[id] = {resolve, reject};
+    if (ctl) ctl.id = id;
+    const body = {model: state.settings.model || DEFAULT_MODEL, max_tokens: opts.max_tokens || 2000, messages: opts.messages};
+    if (opts.system) body.system = opts.system;
+    try { window.Android.ask(id, JSON.stringify(body)); }
+    catch(e){ delete calls[id]; reject({status:0, message:String(e)}); }
+  });
+}
+function cancelClaude(ctl){ const c = ctl && calls[ctl.id]; if (c){ delete calls[ctl.id]; c.reject({code:'cancelled'}); } }
+function looseJSON(t){
+  try { return JSON.parse(t); } catch(e){}
+  const f = t.match(/```(?:json)?\s*([\s\S]*?)```/); if (f){ try { return JSON.parse(f[1]); } catch(e){} }
+  const a = t.indexOf('{'), b = t.lastIndexOf('}'); if (a >= 0 && b > a){ try { return JSON.parse(t.slice(a, b + 1)); } catch(e){} }
+  return null;
+}
+function aiErr(e){
+  if (!e) return '出错了，再试一次。';
+  if (e.code === 'nokey' || e.message === 'nokey') return '先在「我的」里填上 API key。';
+  const s = e.status, msg = String(e.message || '');
+  if (s === 0) return '连不上 Claude 的服务器（api.anthropic.com）。检查一下网络；另外 Anthropic 的 API 只在它支持的国家和地区提供。';
+  if (s === 401) return 'API key 不对，去「我的」里检查一下。';
+  if (s === 403) return '这个 API key 没有权限，或者当前地区不能使用。';
+  if (s === 400 && /credit|balance/i.test(msg)) return 'API 余额不足，去 console.anthropic.com 充值后再试。';
+  if (s === 404) return '找不到这个模型，去「我的」里换一个试试。';
+  if (s === 429) return '请求太频繁或到了用量上限，等一会再试。';
+  if (s >= 500) return 'Claude 现在太忙了，等一会再试。';
+  if (s === -1) return '这次没拿到结果，再试一次。';
+  return '出错了：' + msg.slice(0, 80);
+}
+const catList = list => list.map(c => c.k).join('、');
+function ledgerContext(){
+  const now = new Date(); const k = monthKey(now); const d = monthData(k); const b = state.settings.budget || 0;
+  const cats = o => Object.entries(o).sort((a, c) => c[1] - a[1]).map(([x, v]) => `${x} ¥${r2(v)}`).join('；') || '无';
+  const lines = d.items.slice().sort(byTsDesc).slice(0, 80).map(i => { const t = new Date(i.ts); return `${t.getMonth() + 1}-${t.getDate()} ${typeOf(i) === 'in' ? '收入' : '支出'} ${cat(i.category, typeOf(i)).k} ${i.name || ''} ¥${i.amount}${i.status === 'skipped' ? '（没买，被劝住了）' : ''}`; }).join('\n') || '（还没有记录）';
+  const p = monthData(shiftMonth(k, -1));
+  return `今天：${ymd(now)}（周${WEEK[now.getDay()]}），本月还剩 ${daysLeft()} 天
+本月：支出 ¥${r2(d.out)}（${d.n} 笔），收入 ¥${r2(d.inc)}，每月预算 ${b ? '¥' + b + '（还剩 ¥' + r2(b - d.out) + '）' : '没设'}
+本月支出分类：${cats(d.byCat.out)}
+本月收入分类：${cats(d.byCat.in)}
+本月明细（新到旧）：
+${lines}
+上个月：支出 ¥${r2(p.out)}，收入 ¥${r2(p.inc)}；支出分类：${cats(p.byCat.out)}`;
+}
+
+/* 值不值 */
+let askCtl = null;
+async function askVerdict(){
+  readSheet(); const a = needAmount(); if (!a) return;
+  if (!sh.note){ hint('写上买什么，Claude 才好判断'); const n = $('#sh-note'); if (n) n.focus(); return; }
+  sh.v = {phase:'wait'}; renderSheet();
+  const ctl = askCtl = {};
+  const d = monthData(monthKey(new Date())); const b = state.settings.budget || 0;
+  const same = d.items.filter(i => cat(i.category, typeOf(i)).k === sh.cat && i.status !== 'skipped').slice(-5).map(i => `${i.name || i.category} ¥${i.amount}`).join('；') || '无';
+  const prompt = `用户正准备付款，请判断这笔值不值得花。
+
+要买的：${sh.note}
+价格：¥${a}
+分类：${sh.cat}
+
+本月已花：¥${r2(d.out)}；本月收入：¥${r2(d.inc)}
+每月预算：${b ? '¥' + b + '，还剩 ¥' + r2(b - d.out) : '没设'}
+本月同类已花：¥${r2(d.byCat.out[sh.cat] || 0)}；最近同类：${same}
+今天：${ymd(new Date())}，本月还剩 ${daysLeft()} 天
+
+只回复一个 JSON 对象，不要别的文字：
+{"verdict":"值" 或 "再想想" 或 "不值","score":1到10的整数（10 最值）,"summary":"一句话结论，20 字以内","reasons":["2 到 3 条理由，每条 25 字以内"],"tip":"一条具体建议，比如更便宜的替代、等活动、先放购物车 48 小时，30 字以内"}`;
+  try {
+    const text = await callClaude({system:'你是帮学生管住钱包的朋友，说话直接、具体，不说教。', messages:[{role:'user', content: prompt}], max_tokens: 1500}, ctl);
+    if (!sh || askCtl !== ctl) return;
+    const o = looseJSON(text) || {};
+    let v = String(o.verdict || '').trim(); if (!['值','再想想','不值'].includes(v)) v = /不值/.test(v) ? '不值' : '再想想';
+    let sc = Math.round(Number(o.score)); if (!(sc >= 1 && sc <= 10)) sc = v === '值' ? 7 : v === '不值' ? 3 : 5;
+    sh.v = {phase:'done', verdict:v, score:sc, summary:String(o.summary || ''), reasons: Array.isArray(o.reasons) ? o.reasons.map(String).filter(Boolean).slice(0, 3) : [], tip:String(o.tip || '')};
+    sh.verdictResult = {verdict:v, score:sc};
+  } catch(e){
+    if (!sh || askCtl !== ctl || (e && e.code === 'cancelled')) return;
+    sh.v = {phase:'error', msg: aiErr(e)};
+  }
+  renderSheet();
+}
+function verdictHTML(){
+  const v = sh.v; const item = `${esc(sh.note)} · ${fmt(parseFloat(sh.amt) || 0)}`;
+  if (v.phase === 'wait') return `<div class="verdict"><div class="v-top v-wait"><div class="stamp">想想…</div><div><div class="v-sum">Claude 正在看这笔钱</div><div class="v-item">${item}</div></div></div><button class="btn" type="button" data-v="stop">停止</button></div>`;
+  if (v.phase === 'error') return `<div class="verdict"><p class="hint">${esc(v.msg)}</p><div class="v-act"><button class="btn ai" type="button" data-v="retry">再问一次</button><button class="btn primary" type="button" data-v="buy">直接记一笔</button></div><button class="txtbtn" type="button" data-v="back" style="align-self:center">返回</button></div>`;
+  const cls = v.verdict === '值' ? 'v-good' : v.verdict === '不值' ? 'v-bad' : 'v-warn';
+  return `<div class="verdict"><div class="v-top ${cls}"><div class="stamp">${esc(v.verdict)}</div><div><div class="score"><b>${v.score}</b> / 10</div><div class="v-sum">${esc(v.summary)}</div><div class="v-item">${item}</div></div></div>
+    ${v.reasons.length ? `<ul class="reasons">${v.reasons.map(x => `<li>${esc(x)}</li>`).join('')}</ul>` : ''}
+    ${v.tip ? `<div class="tip"><span>建议</span>${esc(v.tip)}</div>` : ''}
+    <div class="v-act"><button class="btn" type="button" data-v="skip" style="color:var(--good)">听你的，不买了</button><button class="btn primary" type="button" data-v="buy">买了，记一笔</button></div>
+    <button class="txtbtn" type="button" data-v="back" style="align-self:center">返回修改</button></div>`;
+}
+
+/* 聊天 */
+const SUGG = ['午饭 18，奶茶 15','这个月吃饭花了多少？','我想买 299 的耳机，值吗？','下个月怎么少花点？'];
+function renderChat(){
+  const m = $('#msgs'); const off = !state.ai;
+  $('#c-in').disabled = off; $('#c-send').disabled = off || state.chat.some(x => x.wait);
+  $('#chat-sub').textContent = off ? '先在「我的」里填上 API key' : '说"午饭 18"就能记一笔，也可以问账、问值不值';
+  let html = '';
+  if (!state.chat.length){
+    html += off
+      ? `<div class="intro"><div>填上你的 Claude API key 后，我就能帮你记账、查账、判断值不值。</div><button class="btn primary" type="button" data-gokey>去填写</button></div>`
+      : `<div class="intro"><div>我是你的记账助手。可以直接跟我说：</div><div class="sugg">${SUGG.map(s => `<button type="button" data-sugg="${esc(s)}">${esc(s)}</button>`).join('')}</div><div class="muted" style="font-size:.82rem">我能看到你的账本，记下的每一笔都会出现在明细里。</div></div>`;
+  }
+  for (const msg of state.chat){
+    if (msg.role === 'user'){ html += `<div class="msg me">${esc(msg.text)}</div>`; continue; }
+    if (msg.wait){ html += `<div class="msg bot wait">正在想…</div>`; continue; }
+    html += `<div class="msg bot${msg.err ? ' err' : ''}">${msg.text ? `<div>${esc(msg.text)}</div>` : ''}`;
+    for (const id of msg.recs || []){
+      const f = findItem(id); const it = f ? f.it : (msg.snap || {})[id]; if (!it) continue;
+      const t = typeOf(it); const c = cat(it.category, t);
+      html += `<div class="rcard${f ? '' : ' undone'}"><span class="ic" style="--c:${c.c}">${svg(c.i, 16)}</span><span class="n">${esc(it.name || c.k)} · ${c.k}</span><span class="a">${t === 'in' ? '+' : '-'}${money(+it.amount)}</span>${f ? `<button type="button" data-undo="${esc(id)}">撤销</button>` : '<span class="muted" style="font-size:.76rem">已撤销</span>'}</div>`;
+    }
+    html += `</div>`;
+  }
+  m.innerHTML = html;
+  m.scrollTop = m.scrollHeight;
+}
+$('#msgs').addEventListener('click', e => {
+  const s = e.target.closest('[data-sugg]'); if (s){ sendChat(s.dataset.sugg); return; }
+  if (e.target.closest('[data-gokey]')){ setTab('me'); $('#key-in').focus(); return; }
+  const u = e.target.closest('[data-undo]'); if (u){ removeItem(u.dataset.undo); renderChat(); toast('撤销了'); }
+});
+$('#composer').addEventListener('submit', e => { e.preventDefault(); const v = $('#c-in').value.trim(); if (!v) return; $('#c-in').value = ''; sendChat(v); });
+function normRec(r){
+  if (!r || typeof r !== 'object') return null;
+  const type = r.type === 'in' ? 'in' : 'out';
+  const amount = r2(parseFloat(r.amount)); if (!(amount > 0)) return null;
+  const c = cat(String(r.category || ''), type);
+  let ts = new Date().toISOString();
+  const m = String(r.date || '').match(/^(\d{4})-(\d{1,2})-(\d{1,2})/);
+  if (m){ const d = new Date(+m[1], +m[2] - 1, +m[3], 12, 0); if (!isNaN(d) && ymd(d) !== ymd(new Date()) && d < new Date()) ts = d.toISOString(); }
+  return {id:'c-' + uid8(), type, amount, category: c.k, name: String(r.note || '').slice(0, 40), ts, source:'claude'};
+}
+async function sendChat(text){
+  if (!state.ai || state.chat.some(x => x.wait)) return;
+  state.chat.push({role:'user', text});
+  const bot = {role:'assistant', wait:true}; state.chat.push(bot);
+  renderChat();
+  const system = `你是「值不值」记账 app 里的 Claude 记账助手，用户是学生。说话像朋友，简短直接，不说教。
+你能做三件事：
+1. 记账：用户说花了或收到多少钱（比如"午饭 18""奶茶15""妈给了生活费 2000"），就放进 records。一句话里有几笔就放几笔。金额不清楚时不要记，先问。
+2. 查账和分析：按下面的账本数据回答，数字要准确，不要编造账本里没有的记录。
+3. 判断值不值：用户想买东西时，结合本月花销和预算给出明确结论（值 / 再想想 / 不值）和理由。
+只是聊天或提问时，records 为空数组。记了账就在 reply 里简单确认。
+
+只回复一个 JSON 对象，不要别的文字：
+{"reply":"给用户看的回复，中文纯文本，不用 Markdown，150 字以内","records":[{"type":"out 或 in","amount":数字,"category":"从下面分类里选","note":"买了什么，10 字以内","date":"YYYY-MM-DD，没说日期就填今天"}]}
+支出分类：${catList(OUT)}
+收入分类：${catList(IN)}
+
+账本数据：
+${ledgerContext()}`;
+  let hist = state.chat.filter(x => !x.wait && !x.err && (x.text || '').trim()).slice(-10);
+  while (hist.length && hist[0].role !== 'user') hist.shift();
+  const messages = hist.map(h => ({role: h.role === 'user' ? 'user' : 'assistant', content: h.text}));
+  try {
+    const out = await callClaude({system, messages, max_tokens: 2000});
+    const o = looseJSON(out);
+    const recs = o && Array.isArray(o.records) ? o.records.map(normRec).filter(Boolean).slice(0, 10) : [];
+    bot.wait = false;
+    bot.text = o ? String(o.reply || (recs.length ? '记好了。' : '嗯。')) : out;
+    bot.recs = recs.map(x => x.id); bot.snap = Object.fromEntries(recs.map(x => [x.id, x]));
+    if (recs.length){ state.month = monthKey(new Date()); addItems(recs); }
+  } catch(e){
+    bot.wait = false; bot.err = true; bot.text = aiErr(e);
+  }
+  renderChat();
+}
+
+/* 月度点评 */
+async function review(){
+  if (!state.ai || (state.review && state.review.busy)) return;
+  const k = state.month; const d = monthData(k); const [y, m] = k.split('-'); const b = state.settings.budget || 0;
+  const cats = Object.entries(d.byCat.out).sort((a, c) => c[1] - a[1]).map(([x, v]) => `${x} ¥${r2(v)}`).join('；') || '无';
+  const top = d.items.filter(i => i.status !== 'skipped' && typeOf(i) === 'out').sort((a, c) => c.amount - a.amount).slice(0, 15).map(i => { const t = new Date(i.ts); return `- ${t.getMonth() + 1}月${t.getDate()}日 ${i.name || i.category} ¥${i.amount}（${cat(i.category, 'out').k}）`; }).join('\n') || '无';
+  const skipped = d.items.filter(i => i.status === 'skipped').map(i => `${i.name} ¥${i.amount}`).join('；') || '无';
+  const prompt = `下面是用户 ${y}年${Number(m)}月 的账，请点评。
+
+每月预算：${b ? '¥' + b : '没设'}
+支出：¥${r2(d.out)}；收入：¥${r2(d.inc)}
+被劝住没买的：${skipped}
+支出分类：${cats}
+金额最大的几笔：
+${top}
+
+要求：中文纯文本，不要用 # 或 ** 之类的 Markdown 符号。先一句话总评；然后 3 到 5 条以"• "开头的具体观察或建议，每条不超过 40 字；最后一句给下个月定一个具体的金额目标。`;
+  state.review = {busy:true, text:''}; renderStats();
+  try {
+    const text = await callClaude({system:'你是帮学生管钱的朋友，说话直接、具体，不说教。', messages:[{role:'user', content: prompt}], max_tokens: 2500});
+    state.review = {busy:false, text};
+  } catch(e){ state.review = {busy:false, text: aiErr(e)}; }
+  renderStats();
+}
+
+/* ---------- 我的 ---------- */
+$('#key-save').addEventListener('click', () => {
+  if (!NATIVE){ toast('在安卓 app 里才能保存'); return; }
+  const k = $('#key-in').value.trim();
+  if (k && !/^sk-/.test(k)){ toast('看起来不像 API key，应该以 sk- 开头'); return; }
+  window.Android.setKey(k); $('#key-in').value = '';
+  refreshNative(); renderData(); renderChat();
+  toast(k ? 'API key 已保存' : '已清除 API key');
+});
+$('#model-sel').addEventListener('change', e => { state.settings = Object.assign({}, state.settings, {model: e.target.value}); persist(); toast('已切换模型'); });
+$('#budget-in').addEventListener('change', () => {
+  const v = parseFloat($('#budget-in').value);
+  state.settings = Object.assign({}, state.settings, {budget: v > 0 ? Math.round(v) : 0});
+  persist(); renderHome();
+  toast(v > 0 ? `每月预算 ${fmt0(v)}` : '已清除预算');
+});
+$('#ls-btn').addEventListener('click', () => { if (NATIVE) window.Android.openListenerSettings(); else toast('在安卓 app 里才能开启'); });
+$('#export-btn').addEventListener('click', () => {
+  if (!NATIVE){ toast('在安卓 app 里才能导出'); return; }
+  flush();
+  window.Android.exportData(`值不值备份-${ymd(new Date())}.json`, JSON.stringify({app:'zhibuzhi', v:1, months: state.months, settings:{budget: state.settings.budget || 0}}));
+});
+
+/* ---------- 导入账单 / 恢复备份 ---------- */
+const CAT_KEYS = [
+  ['游戏', ['游戏','点券','王者','原神','Steam','steam','米哈游','网易游戏','腾讯游戏','和平精英']],
+  ['零食饮料', ['奶茶','咖啡','瑞幸','喜茶','蜜雪','茶百道','古茗','星巴克','库迪','饮料','零食','便利店','罗森','全家','711','7-Eleven']],
+  ['餐饮', ['餐饮','美食','外卖','饿了么','食堂','饭','面馆','麦当劳','肯德基','汉堡','火锅','米线','快餐','烧烤','餐厅']],
+  ['话费网费', ['话费','流量','宽带','校园网','中国移动','中国联通','中国电信']],
+  ['购物', ['服饰','服装','鞋','衣','优衣库','淘宝','拼多多','京东','天猫','抖音']],
+  ['数码', ['数码','电器','手机','耳机','电脑','Apple','苹果','小米','华为']],
+  ['学习', ['教育','培训','书','文具','打印','课程','学费','考试']],
+  ['交通', ['交通','出行','地铁','公交','滴滴','打车','高铁','火车','12306','铁路','加油','单车','哈啰','骑行','航空']],
+  ['娱乐', ['文化休闲','休闲娱乐','电影','影城','KTV','会员','视频','音乐','爱奇艺','优酷','哔哩哔哩','网易云','演出','腾讯视频']],
+  ['人情社交', ['红包','转账','礼物','请客']],
+  ['日用', ['日用','百货','超市','洗','纸巾','生活服务','水电']],
+];
+function guessOut(text){ for (const [c, ks] of CAT_KEYS) if (ks.some(k => text.includes(k))) return c; return '其他'; }
+function guessIn(text){ if (/奖学金|助学金/.test(text)) return '奖学金'; if (/红包/.test(text)) return '红包'; if (/工资|兼职|劳务|报酬/.test(text)) return '兼职'; if (/生活费/.test(text)) return '生活费'; return '其他收入'; }
+function parseCSV(t){
+  const rows = []; let row = [], f = '', q = false;
+  for (let i = 0; i < t.length; i++){
+    const c = t[i];
+    if (q){ if (c === '"'){ if (t[i + 1] === '"'){ f += '"'; i++; } else q = false; } else f += c; }
+    else if (c === '"') q = true;
+    else if (c === ','){ row.push(f); f = ''; }
+    else if (c === '\n'){ row.push(f); rows.push(row); row = []; f = ''; }
+    else if (c !== '\r') f += c;
+  }
+  if (f || row.length){ row.push(f); rows.push(row); }
+  return rows;
+}
+function toDate(v){
+  if (v instanceof Date && !isNaN(v)) return v;
+  if (typeof v === 'number' && v > 20000) return new Date(Math.round((v - 25569) * 864e5) + new Date().getTimezoneOffset() * 6e4);
+  const m = String(v || '').trim().replace(/\//g, '-').match(/(\d{4})-(\d{1,2})-(\d{1,2})(?:\s+(\d{1,2}):(\d{2})(?::(\d{2}))?)?/);
+  if (!m) return null;
+  return new Date(+m[1], +m[2] - 1, +m[3], +(m[4] || 0), +(m[5] || 0), +(m[6] || 0));
+}
+function parseBill(rows, fname){
+  const hi = rows.findIndex(r => r.some(c => String(c).trim() === '交易时间'));
+  if (hi < 0) return null;
+  const h = rows[hi].map(c => String(c).trim());
+  const idx = (...names) => { for (const n of names){ const i = h.findIndex(x => x === n || x.startsWith(n)); if (i >= 0) return i; } return -1; };
+  const iT = idx('交易时间'), iIO = idx('收/支'), iAmt = idx('金额'), iGoods = idx('商品说明','商品'), iParty = idx('交易对方'), iType = idx('交易分类','交易类型'), iSt = idx('交易状态','当前状态'), iNo = idx('交易订单号','交易单号');
+  if (iIO < 0 || iAmt < 0) return null;
+  const isAli = h.includes('交易订单号') || h.includes('商品说明') || /支付宝|alipay/i.test(fname);
+  const source = isAli ? 'alipay' : 'wechat', platform = isAli ? '支付宝' : '微信';
+  const cell = (r, i) => i >= 0 ? String(r[i] ?? '').trim() : '';
+  const out = [];
+  for (const r of rows.slice(hi + 1)){
+    const io = cell(r, iIO); if (io !== '支出' && io !== '收入') continue;
+    const type = io === '收入' ? 'in' : 'out';
+    const st = cell(r, iSt), tp = cell(r, iType);
+    if (/退款成功|全额退款|已退款|交易关闭|失败/.test(st)) continue;
+    if (type === 'in' && /退款/.test(tp + st)) continue;
+    const amt = parseFloat(cell(r, iAmt).replace(/[¥￥,\s]/g, '')); if (!(amt > 0)) continue;
+    const d = toDate(iT >= 0 ? r[iT] : null); if (!d) continue;
+    let goods = cell(r, iGoods); const party = cell(r, iParty);
+    if (!goods || goods === '/') goods = party;
+    else if (party && party !== '/' && !goods.includes(party) && goods.length < 14) goods = party + ' · ' + goods;
+    const no = cell(r, iNo).replace(/[^0-9A-Za-z]/g, '');
+    const txt = tp + ' ' + party + ' ' + goods;
+    out.push({ id: source + '-' + (no || (d.getTime() + '-' + amt)), type, name: (goods || '未命名').slice(0, 40), amount: r2(amt), platform,
+      category: type === 'in' ? guessIn(txt) : guessOut(txt), ts: d.toISOString(), source });
+  }
+  return out;
+}
+function loadScript(src){ return new Promise((res, rej) => { const s = document.createElement('script'); s.src = src; s.onload = res; s.onerror = rej; document.head.appendChild(s); }); }
+async function loadXLSX(){
+  if (window.XLSX) return;
+  // 先找 assets 里的本地文件（见 README），没有再从网上加载
+  try { await loadScript('xlsx.full.min.js'); if (window.XLSX) return; } catch(e){}
+  await loadScript('https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js');
+}
+function mergeBackup(obj){
+  const have = new Set(); for (const k in state.months) for (const i of state.months[k]) have.add(i.id);
+  const fresh = [];
+  for (const k in obj.months || {}) for (const i of obj.months[k] || []) if (i && i.id && !have.has(i.id) && +i.amount > 0 && i.ts){ have.add(i.id); fresh.push(i); }
+  if (!state.settings.budget && obj.settings && obj.settings.budget) state.settings = Object.assign({}, state.settings, {budget: +obj.settings.budget || 0});
+  addItems(fresh);
+  return fresh.length;
+}
+$('#bill-file').addEventListener('change', async e => {
+  const f = e.target.files && e.target.files[0]; if (!f) return;
+  const st = $('#import-status'); st.textContent = '正在读取…';
+  try {
+    const buf = await f.arrayBuffer();
+    const head = new TextDecoder('utf-8').decode(buf.slice(0, 64)).trim();
+    if (/\.json$/i.test(f.name) || head.startsWith('{')){
+      const obj = JSON.parse(new TextDecoder('utf-8').decode(buf));
+      if (!obj || !obj.months){ st.textContent = '这不是值不值的备份文件。'; return; }
+      const n = mergeBackup(obj); st.textContent = `从备份恢复了 ${n} 笔。`; toast(`恢复了 ${n} 笔`); return;
+    }
+    let rows;
+    const isZip = new Uint8Array(buf.slice(0, 2)).join(',') === '80,75';
+    if (/\.xlsx?$/i.test(f.name) || isZip){
+      st.textContent = '正在加载表格解析…';
+      try { await loadXLSX(); } catch(_){ st.textContent = '读 .xlsx 需要联网加载解析库，连不上。可以联网后再试，或在电脑上另存为 .csv 再导入。'; return; }
+      const wb = XLSX.read(buf, {type:'array', cellDates:true});
+      rows = XLSX.utils.sheet_to_json(wb.Sheets[wb.SheetNames[0]], {header:1, raw:true, defval:''});
+    } else {
+      let text = new TextDecoder('utf-8').decode(buf);
+      if (!text.includes('交易时间')){ try { text = new TextDecoder('gbk').decode(buf); } catch(_){} }
+      rows = parseCSV(text);
+    }
+    const items = parseBill(rows, f.name);
+    if (!items){ st.textContent = '没认出这个文件。请选微信或支付宝导出的原始账单（.csv 或 .xlsx），注意要先解压。'; return; }
+    if (!items.length){ st.textContent = '这个文件里没有收支记录。'; return; }
+    const have = new Set(); for (const k in state.months) for (const i of state.months[k]) have.add(i.id);
+    const fresh = []; let dup = 0;
+    for (const it of items){ if (have.has(it.id)){ dup++; continue; } have.add(it.id); fresh.push(it); }
+    if (fresh.length){ state.month = fresh.map(i => monthKey(new Date(i.ts))).sort().pop(); state.showAll = false; }
+    addItems(fresh);
+    const msg = `导入了 ${fresh.length} 笔` + (dup ? `，跳过 ${dup} 笔已有的` : '');
+    st.textContent = msg + '。'; toast(msg);
+  } catch(err){ st.textContent = '读取失败。确认文件已经解压，再选一次。'; }
+  finally { e.target.value = ''; }
+});
+
+/* ---------- 启动 ---------- */
+window.__onResume = () => { refreshNative(); renderData(); };
+loadData();
+refreshNative();
+setTab('home');
+renderData();
+})();
+</script>
+</body>
+</html>
