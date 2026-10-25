@@ -2,6 +2,7 @@ package com.zhibuzhi.app;
 
 import android.annotation.SuppressLint;
 import android.app.Activity;
+import android.app.NotificationManager;
 import android.content.ActivityNotFoundException;
 import android.content.ComponentName;
 import android.content.Intent;
@@ -12,6 +13,7 @@ import android.net.Uri;
 import android.os.Build;
 import android.os.Bundle;
 import android.provider.Settings;
+import android.service.notification.NotificationListenerService;
 import android.view.View;
 import android.webkit.JavascriptInterface;
 import android.webkit.ValueCallback;
@@ -40,23 +42,27 @@ import java.util.concurrent.Executors;
 
 /**
  * 整个 app 就是一个全屏 WebView，界面在 assets/index.html。
- * 这里负责：保存账本、保存 API key、调用 AI 接口（Claude / GPT / 其他兼容 OpenAI 的服务）、选文件、导出备份、付款通知。
+ * 这里负责：保存账本（带上一版备份）、保存 API key、调用 AI 接口、选文件、导出文件、
+ * 通知权限、付款识别、还款提醒。
  */
 public class MainActivity extends Activity {
 
     private static final int REQ_FILE = 1;
     private static final int REQ_EXPORT = 2;
     private static final int REQ_NOTIFY = 3;
+    private static final String NOTIFY_PERM = "android.permission.POST_NOTIFICATIONS";
     // 三种服务商：claude（Anthropic）、openai（GPT）、custom（其他兼容 OpenAI 格式的服务）
     private static final String CLAUDE_URL = "https://api.anthropic.com/v1/messages";
     private static final String CLAUDE_VERSION = "2023-06-01";
     private static final String OPENAI_URL = "https://api.openai.com/v1/chat/completions";
     private static final String DATA_FILE = "data.json";
+    private static final String BAK_FILE = "data.json.bak";
 
     private WebView web;
     private ValueCallback<Uri[]> fileCallback;
     private String exportPayload;
     private String pendingPayId;
+    private String pendingDebtId;
     private boolean pageReady;
     private final ExecutorService pool = Executors.newCachedThreadPool();
 
@@ -66,6 +72,7 @@ public class MainActivity extends Activity {
         super.onCreate(savedInstanceState);
         applySystemBars();
         migrateKey();
+        Reminders.rearm(getApplicationContext());
 
         web = new WebView(this);
         web.setBackgroundColor(isNight() ? 0xFF0B0D10 : 0xFFF2F3F5);
@@ -93,7 +100,7 @@ public class MainActivity extends Activity {
             @Override
             public void onPageFinished(WebView view, String url) {
                 pageReady = true;
-                deliverPayment();
+                deliverPending();
             }
         });
 
@@ -147,20 +154,32 @@ public class MainActivity extends Activity {
         handleIntent(intent);
     }
 
+    /** 从通知点进来：付款通知带 payId，还款提醒带 debtId */
     private void handleIntent(Intent intent) {
-        if (intent != null && intent.hasExtra("payId")) {
+        if (intent == null) return;
+        if (intent.hasExtra("payId")) {
             pendingPayId = intent.getStringExtra("payId");
             intent.removeExtra("payId");
-            deliverPayment();
         }
+        if (intent.hasExtra("debtId")) {
+            pendingDebtId = intent.getStringExtra("debtId");
+            intent.removeExtra("debtId");
+        }
+        deliverPending();
     }
 
-    /** 用户点了“刚付了 ¥xx”的通知：让页面打开对应的记账弹层 */
-    private void deliverPayment() {
-        if (!pageReady || pendingPayId == null) return;
-        String id = pendingPayId;
-        pendingPayId = null;
-        js("window.__onPayment&&window.__onPayment(" + JSONObject.quote(id) + ")");
+    private void deliverPending() {
+        if (!pageReady) return;
+        if (pendingPayId != null) {
+            String id = pendingPayId;
+            pendingPayId = null;
+            js("window.__onPayment&&window.__onPayment(" + JSONObject.quote(id) + ")");
+        }
+        if (pendingDebtId != null) {
+            String id = pendingDebtId;
+            pendingDebtId = null;
+            js("window.__onDebt&&window.__onDebt(" + JSONObject.quote(id) + ")");
+        }
     }
 
     @Override
@@ -194,6 +213,16 @@ public class MainActivity extends Activity {
         });
     }
 
+    @Override
+    public void onRequestPermissionsResult(int requestCode, String[] permissions, int[] grantResults) {
+        super.onRequestPermissionsResult(requestCode, permissions, grantResults);
+        if (requestCode != REQ_NOTIFY || !pageReady) return;
+        boolean ok = grantResults.length > 0 && grantResults[0] == PackageManager.PERMISSION_GRANTED;
+        js("window.__onResume&&window.__onResume()");
+        String msg = ok ? "通知权限已开启" : "没有开启通知权限，提醒不会弹出";
+        js("window.__toast&&window.__toast(" + JSONObject.quote(msg) + ")");
+    }
+
     @SuppressWarnings("deprecation")
     @Override
     protected void onActivityResult(int requestCode, int resultCode, Intent data) {
@@ -206,7 +235,10 @@ public class MainActivity extends Activity {
         } else if (requestCode == REQ_EXPORT) {
             final String payload = exportPayload;
             exportPayload = null;
-            if (resultCode != RESULT_OK || data == null || data.getData() == null || payload == null) return;
+            if (resultCode != RESULT_OK || data == null || data.getData() == null || payload == null) {
+                js("window.__toast&&window.__toast('已取消导出')");
+                return;
+            }
             final Uri uri = data.getData();
             pool.execute(() -> {
                 boolean ok = false;
@@ -217,7 +249,7 @@ public class MainActivity extends Activity {
                     }
                 } catch (Exception ignored) {
                 }
-                final String msg = ok ? "备份已保存" : "保存失败，再试一次";
+                final String msg = ok ? "已导出" : "导出失败：文件没写进去，换个位置再试一次";
                 runOnUiThread(() -> js("window.__toast&&window.__toast(" + JSONObject.quote(msg) + ")"));
             });
         }
@@ -259,7 +291,22 @@ public class MainActivity extends Activity {
         return CLAUDE_URL;
     }
 
+    private void openNotifySettings() {
+        try {
+            Intent i = new Intent(Settings.ACTION_APP_NOTIFICATION_SETTINGS);
+            i.putExtra(Settings.EXTRA_APP_PACKAGE, getPackageName());
+            startActivity(i);
+        } catch (ActivityNotFoundException e) {
+            try {
+                startActivity(new Intent(Settings.ACTION_APPLICATION_DETAILS_SETTINGS, Uri.parse("package:" + getPackageName())));
+            } catch (ActivityNotFoundException ignored) {
+            }
+        }
+    }
+
     // ---------- 文件读写 ----------
+    // 每次保存先写临时文件，再把旧文件留成 data.json.bak，最后换上新文件。
+    // 读取失败时页面会先试 .bak；都不行就把坏文件改名留着，绝不覆盖。
 
     private static String readAll(InputStream in) throws IOException {
         ByteArrayOutputStream bos = new ByteArrayOutputStream();
@@ -269,8 +316,8 @@ public class MainActivity extends Activity {
         return new String(bos.toByteArray(), StandardCharsets.UTF_8);
     }
 
-    private String readData() {
-        File f = new File(getFilesDir(), DATA_FILE);
+    private String readFile(String name) {
+        File f = new File(getFilesDir(), name);
         if (!f.exists()) return "";
         try (FileInputStream in = new FileInputStream(f)) {
             return readAll(in);
@@ -283,18 +330,31 @@ public class MainActivity extends Activity {
         File dir = getFilesDir();
         File tmp = new File(dir, DATA_FILE + ".tmp");
         File dst = new File(dir, DATA_FILE);
+        File bak = new File(dir, BAK_FILE);
         try (FileOutputStream out = new FileOutputStream(tmp)) {
             out.write(json.getBytes(StandardCharsets.UTF_8));
             out.getFD().sync();
         } catch (IOException e) {
+            //noinspection ResultOfMethodCallIgnored
+            tmp.delete();
             return false;
         }
-        if (!tmp.renameTo(dst)) {
+        if (dst.exists()) {
             //noinspection ResultOfMethodCallIgnored
-            dst.delete();
-            return tmp.renameTo(dst);
+            bak.delete();
+            if (!dst.renameTo(bak)) {
+                //noinspection ResultOfMethodCallIgnored
+                dst.delete();
+            }
         }
-        return true;
+        return tmp.renameTo(dst);
+    }
+
+    private synchronized String keepCorrupt() {
+        File dst = new File(getFilesDir(), DATA_FILE);
+        if (!dst.exists()) return "";
+        String name = "data-broken-" + System.currentTimeMillis() + ".json";
+        return dst.renameTo(new File(getFilesDir(), name)) ? name : "";
     }
 
     // ---------- 调用 AI 接口 ----------
@@ -365,15 +425,30 @@ public class MainActivity extends Activity {
 
     public class Bridge {
 
+        // 账本
+
         @JavascriptInterface
         public String load() {
-            return readData();
+            String s = readFile(DATA_FILE);
+            return s.isEmpty() ? readFile(BAK_FILE) : s;
+        }
+
+        @JavascriptInterface
+        public String loadBackup() {
+            return readFile(BAK_FILE);
+        }
+
+        @JavascriptInterface
+        public String keepCorrupt() {
+            return MainActivity.this.keepCorrupt();
         }
 
         @JavascriptInterface
         public boolean save(String json) {
             return json != null && writeData(json);
         }
+
+        // AI
 
         @JavascriptInterface
         public boolean hasKey(String provider) {
@@ -407,9 +482,16 @@ public class MainActivity extends Activity {
             pool.execute(() -> callApi(id, provider, body));
         }
 
+        // 付款识别
+
         @JavascriptInterface
         public String getPending() {
             return getSharedPreferences(PayListener.PREFS, MODE_PRIVATE).getString("pending", "[]");
+        }
+
+        @JavascriptInterface
+        public String getLastDetect() {
+            return getSharedPreferences(PayListener.PREFS, MODE_PRIVATE).getString("last", "");
         }
 
         @JavascriptInterface
@@ -447,26 +529,73 @@ public class MainActivity extends Activity {
             });
         }
 
-        /** Android 13 起，发通知要先征得同意；只问一次 */
+        /** 部分手机会把通知监听服务断开，回到 app 时请系统重新连上 */
         @JavascriptInterface
-        public void askNotify() {
-            if (Build.VERSION.SDK_INT < 33) return;
-            if (prefs().getBoolean("askedNotify", false)) return;
+        public void rebindListener() {
+            try {
+                NotificationListenerService.requestRebind(new ComponentName(MainActivity.this, PayListener.class));
+            } catch (Exception ignored) {
+            }
+        }
+
+        // 通知权限
+
+        @JavascriptInterface
+        public boolean notifyAllowed() {
+            NotificationManager nm = (NotificationManager) getSystemService(NOTIFICATION_SERVICE);
+            return nm != null && nm.areNotificationsEnabled();
+        }
+
+        /** Android 13 起先弹系统询问；问过且被拒绝后，直接打开本 app 的通知设置 */
+        @JavascriptInterface
+        public void requestNotify() {
             runOnUiThread(() -> {
-                if (checkSelfPermission("android.permission.POST_NOTIFICATIONS") != PackageManager.PERMISSION_GRANTED) {
-                    prefs().edit().putBoolean("askedNotify", true).apply();
-                    requestPermissions(new String[]{"android.permission.POST_NOTIFICATIONS"}, REQ_NOTIFY);
+                boolean canAsk = Build.VERSION.SDK_INT >= 33
+                        && checkSelfPermission(NOTIFY_PERM) != PackageManager.PERMISSION_GRANTED
+                        && (!prefs().getBoolean("askedNotify2", false) || shouldShowRequestPermissionRationale(NOTIFY_PERM));
+                if (canAsk) {
+                    prefs().edit().putBoolean("askedNotify2", true).apply();
+                    requestPermissions(new String[]{NOTIFY_PERM}, REQ_NOTIFY);
+                } else {
+                    openNotifySettings();
                 }
             });
         }
 
         @JavascriptInterface
-        public void exportData(final String fileName, final String json) {
-            exportPayload = json;
+        public void openNotifySettings() {
+            runOnUiThread(MainActivity.this::openNotifySettings);
+        }
+
+        /** 旧版页面用的，保留兼容 */
+        @JavascriptInterface
+        public void askNotify() {
+            if (Build.VERSION.SDK_INT < 33) return;
+            if (prefs().getBoolean("askedNotify", false)) return;
+            runOnUiThread(() -> {
+                if (checkSelfPermission(NOTIFY_PERM) != PackageManager.PERMISSION_GRANTED) {
+                    prefs().edit().putBoolean("askedNotify", true).apply();
+                    requestPermissions(new String[]{NOTIFY_PERM}, REQ_NOTIFY);
+                }
+            });
+        }
+
+        // 还款提醒
+
+        @JavascriptInterface
+        public void setReminders(String json) {
+            Reminders.schedule(getApplicationContext(), json);
+        }
+
+        // 导出
+
+        @JavascriptInterface
+        public boolean exportFile(final String fileName, final String mime, final String content) {
+            exportPayload = content;
             runOnUiThread(() -> {
                 Intent i = new Intent(Intent.ACTION_CREATE_DOCUMENT);
                 i.addCategory(Intent.CATEGORY_OPENABLE);
-                i.setType("application/json");
+                i.setType(mime == null || mime.isEmpty() ? "application/octet-stream" : mime);
                 i.putExtra(Intent.EXTRA_TITLE, fileName);
                 try {
                     startActivityForResult(i, REQ_EXPORT);
@@ -475,6 +604,12 @@ public class MainActivity extends Activity {
                     js("window.__toast&&window.__toast('这台手机不支持导出文件')");
                 }
             });
+            return true;
+        }
+
+        @JavascriptInterface
+        public void exportData(final String fileName, final String json) {
+            exportFile(fileName, "application/json", json);
         }
     }
 }
