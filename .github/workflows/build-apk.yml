@@ -13,11 +13,26 @@ jobs:
         with:
           distribution: temurin
           java-version: '17'
+      - name: Signing key
+        env:
+          KEYSTORE_B64: ${{ secrets.KEYSTORE_B64 }}
+        run: |
+          if [ -n "$KEYSTORE_B64" ]; then
+            echo "$KEYSTORE_B64" | base64 -d > "$RUNNER_TEMP/zbz.jks"
+            echo "ZBZ_KEYSTORE=$RUNNER_TEMP/zbz.jks" >> "$GITHUB_ENV"
+          else
+            echo "::warning::No KEYSTORE_B64 secret found. Building a debug APK that must be uninstalled before each update."
+          fi
       - name: Build
         run: |
           chmod +x gradlew
-          ./gradlew assembleDebug --no-daemon --stacktrace
-      - run: cp app/build/outputs/apk/debug/app-debug.apk zhibuzhi.apk
+          if [ -n "$ZBZ_KEYSTORE" ]; then
+            ./gradlew assembleRelease --no-daemon --stacktrace
+            cp app/build/outputs/apk/release/app-release.apk zhibuzhi.apk
+          else
+            ./gradlew assembleDebug --no-daemon --stacktrace
+            cp app/build/outputs/apk/debug/app-debug.apk zhibuzhi.apk
+          fi
       - uses: actions/upload-artifact@v4
         with:
           name: zhibuzhi-apk
