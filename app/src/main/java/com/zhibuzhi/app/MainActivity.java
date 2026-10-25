@@ -529,6 +529,34 @@ public class MainActivity extends Activity {
             });
         }
 
+        /** 排查用：监听服务是否在运行、最近什么时候收到过微信 / 支付宝的通知、最近 20 条判断记录 */
+        @JavascriptInterface
+        public String getPayDiag() {
+            SharedPreferences sp = getSharedPreferences(PayListener.PREFS, MODE_PRIVATE);
+            JSONObject o = new JSONObject();
+            try {
+                o.put("running", PayListener.running);
+                o.put("seenWx", sp.getLong("seen_wx", 0L));
+                o.put("seenAli", sp.getLong("seen_ali", 0L));
+                JSONArray log;
+                try {
+                    log = new JSONArray(sp.getString("log", "[]"));
+                } catch (JSONException e) {
+                    log = new JSONArray();
+                }
+                o.put("log", log);
+            } catch (JSONException ignored) {
+            }
+            return o.toString();
+        }
+
+        @JavascriptInterface
+        public void clearPayLog() {
+            synchronized (PayListener.LOCK) {
+                getSharedPreferences(PayListener.PREFS, MODE_PRIVATE).edit().remove("log").apply();
+            }
+        }
+
         /** 部分手机会把通知监听服务断开，回到 app 时请系统重新连上 */
         @JavascriptInterface
         public void rebindListener() {
