@@ -324,6 +324,10 @@ details[open] summary::after{transform:rotate(45deg)}
 .filebtn{position:relative;overflow:hidden;align-self:flex-start}
 .filebtn input{position:absolute;inset:0;opacity:0}
 .on{color:var(--good)!important}
+.pl-item{background:var(--sunk);border-radius:12px;padding:10px 12px}
+.pl-h{display:flex;flex-wrap:wrap;align-items:baseline;gap:4px 8px;font-size:.8rem}
+.pl-h .pl-v{margin-left:auto;color:var(--warn)}
+.pl-t{margin-top:4px;font-size:.78rem;color:var(--muted);word-break:break-all}
 .me-head{display:flex;align-items:center;gap:12px;padding:6px 2px}
 .logo{width:52px;height:52px;border-radius:16px;background:var(--hero);color:var(--hero-ink);display:grid;place-items:center;font-family:var(--stamp);font-weight:900;font-size:1.5rem;transform:rotate(-6deg)}
 .me-head h1{margin:0;font-size:1.25rem}
@@ -374,6 +378,20 @@ details[open] summary::after{transform:rotate(45deg)}
     <h3 class="sec">提醒和权限</h3>
     <div class="group">
       <div class="row"><span class="ic" style="--c:#2BAE66" data-icon="scan"></span><div class="grow">付款识别<small id="ls-status">未开启</small><small id="ls-last"></small></div><button class="btn sm" type="button" id="ls-btn">去开启</button></div>
+      <details id="d-paylog">
+        <summary><span class="ic" style="--c:#7A8BA3" data-icon="list"></span><span class="grow">识别不到？看看收到了什么</span></summary>
+        <div class="d-body">
+          <p class="muted" id="pl-state"></p>
+          <div id="pl-list" style="display:flex;flex-direction:column;gap:8px"></div>
+          <ol class="muted">
+            <li><b>微信</b>：「我 → 设置 → 消息通知」里打开「通知显示消息详情」，不然通知里看不到付款内容。</li>
+            <li><b>支付宝</b>：系统设置里允许支付宝发通知，支付宝自己的设置里也要打开消息通知。</li>
+            <li>付款时微信或支付宝正开在屏幕上，它们有时不弹系统通知，这种情况这里也收不到，只能手动记。</li>
+            <li>上面写「没在运行」：给「值不值」开自启动、电池设成不限制，再把权限关掉重新打开。</li>
+          </ol>
+          <button class="btn sm" type="button" id="pl-clear" style="align-self:flex-start">清空记录</button>
+        </div>
+      </details>
       <div class="row"><span class="ic" style="--c:#E6618C" data-icon="bell"></span><div class="grow">通知权限<small id="nt-status">检查中</small></div><button class="btn sm" type="button" id="nt-btn">去开启</button></div>
       <div class="row"><span class="ic" style="--c:#B8763E" data-icon="cal"></span><div class="grow"><label for="remind-on">还款提醒</label><small id="rm-status">按每笔欠款的设置，早上 9 点左右提醒</small></div><label class="sw"><input type="checkbox" id="remind-on" aria-label="还款提醒总开关"><span></span></label></div>
     </div>
@@ -681,7 +699,7 @@ function refreshNative(){
   if (NATIVE){ try { const a = JSON.parse(N('getPending') || '[]'); if (Array.isArray(a)) state.pending = a.sort((x, y) => y.ts - x.ts); } catch(e){} }
   state.perms.listener = NATIVE && !!N('listenerOn');
   state.perms.notify = !NATIVE || N('notifyAllowed') !== false;
-  if (state.perms.listener) N('rebindListener');
+  if (state.perms.listener){ N('rebindListener'); setTimeout(renderPayDiag, 1500); }
   try { const ld = NATIVE ? N('getLastDetect') : ''; state.lastDetect = ld ? JSON.parse(ld) : null; } catch(e){ state.lastDetect = null; }
   const ks = $('#key-status');
   if (ks) ks.textContent = hasKey ? '已保存：' + (N('keyHint', p) || '') : (NATIVE ? '还没填，填了才能用 AI 功能' : '在安卓 app 里才能用');
@@ -690,6 +708,7 @@ function refreshNative(){
 }
 function renderPerms(){
   const ls = $('#ls-status'), lb = $('#ls-btn'), ll = $('#ls-last'), ns = $('#nt-status'), nb = $('#nt-btn'), rs = $('#rm-status');
+  renderPayDiag();
   $('#remind-on').checked = state.settings.remindOn !== false;
   if (!NATIVE){ ls.textContent = '在安卓 app 里才能用'; lb.hidden = true; ns.textContent = '在安卓 app 里才能用'; nb.hidden = true; ll.textContent = ''; return; }
   const on = state.perms.listener;
@@ -705,6 +724,24 @@ function renderPerms(){
   if (state.settings.remindOn === false){ rs.textContent = '已关闭，所有欠款都不会提醒'; rs.className = 'off'; }
   else if (!nt){ rs.textContent = '已开启，但通知权限没开，提醒不会弹出'; rs.className = 'off'; }
   else { rs.textContent = `按每笔欠款的设置，早上 ${REMIND_HOUR} 点左右提醒`; rs.className = ''; }
+}
+function renderPayDiag(){
+  const st = $('#pl-state'), list = $('#pl-list');
+  if (!st || !list) return;
+  if (!NATIVE){ st.textContent = '在安卓 app 里才能用'; list.innerHTML = ''; return; }
+  let d = null;
+  try { d = JSON.parse(N('getPayDiag') || 'null'); } catch(e){ d = null; }
+  if (!d){ st.textContent = '这个版本还看不了，更新一下 app'; list.innerHTML = ''; return; }
+  const lines = [];
+  if (!state.perms.listener) lines.push('付款识别没开启，先点上面的「去开启」');
+  else lines.push(d.running ? '监听：运行中' : '监听：没在运行，可能被系统停掉了（已经让它重新连接）');
+  lines.push('微信通知：' + (d.seenWx ? '最近一次 ' + whenLabel(d.seenWx) : '还没收到过'));
+  lines.push('支付宝通知：' + (d.seenAli ? '最近一次 ' + whenLabel(d.seenAli) : '还没收到过'));
+  st.innerHTML = lines.map(esc).join('<br>');
+  const log = Array.isArray(d.log) ? d.log.slice().reverse() : [];
+  list.innerHTML = log.length
+    ? log.map(e => `<div class="pl-item"><div class="pl-h"><b>${esc(e.platform)}</b><span class="muted">${esc(whenLabel(+e.ts))}</span><span class="pl-v${e.ok ? ' on' : ''}">${esc(e.verdict)}</span></div><div class="pl-t">${esc(e.text)}</div></div>`).join('')
+    : '<p class="muted">还没收到过微信支付或支付宝的通知。付一笔小钱试试，再回来看这里。</p>';
 }
 function askPerm(kind){
   if (!NATIVE){ toast('在安卓 app 里才能开启'); return; }
@@ -1671,6 +1708,8 @@ $('#budget-in').addEventListener('change', () => {
   toast(v > 0 ? `每月预算 ${fmt0(v)}` : '已清除预算');
 });
 $('#ls-btn').addEventListener('click', () => askPerm('listener'));
+$('#pl-clear').addEventListener('click', () => { N('clearPayLog'); renderPayDiag(); toast('已清空'); });
+$('#d-paylog').addEventListener('toggle', () => { if ($('#d-paylog').open) renderPayDiag(); });
 $('#nt-btn').addEventListener('click', () => askPerm('notify'));
 $('#remind-on').addEventListener('change', e => {
   const on = e.target.checked;
